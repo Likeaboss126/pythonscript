@@ -3,8 +3,8 @@ import psycopg2
 try:
     # Connect to PostgreSQL
     conn = psycopg2.connect(
-        host="your-db-host.com",     # e.g., "localhost" or an IP address
-        port=5432,                   # Default PostgreSQL port
+        host="your-db-host.com",
+        port=5432,
         dbname="your_database",
         user="your_user",
         password="your_password"
@@ -13,14 +13,18 @@ try:
     # Create a cursor
     cur = conn.cursor()
 
-    # Run a simple query
-    cur.execute("SELECT version();")
-    db_version = cur.fetchone()
-    print("Connected to:", db_version)
+    # Query: select first 10 rows from a table
+    cur.execute("SELECT * FROM your_table_name LIMIT 10;")
+
+    # Fetch and print results
+    rows = cur.fetchall()
+    print("📋 First 10 Records:")
+    for row in rows:
+        print(row)
 
     # Clean up
     cur.close()
     conn.close()
 
 except Exception as e:
-    print("❌ Failed to connect to the database:", e)
+    print("❌ Error querying the database:", e)
