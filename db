@@ -1,0 +1,25 @@
+import psycopg2
+
+# Set up connection parameters
+conn = psycopg2.connect(
+    host="your-db-host.com",
+    port=5432,
+    dbname="your_database",
+    user="your_user",
+    password="your_password",
+
+    # SSL/TLS certificate paths
+    sslmode="verify-full",                    # Options: disable, require, verify-ca, verify-full
+    sslrootcert="/path/to/root.crt",          # Server CA certificate
+    sslcert="/path/to/client.crt",            # Client certificate
+    sslkey="/path/to/client.key"              # Client private key
+)
+
+# Example query
+cur = conn.cursor()
+cur.execute("SELECT version();")
+print(cur.fetchone())
+
+# Clean up
+cur.close()
+conn.close()
