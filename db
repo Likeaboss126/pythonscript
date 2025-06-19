@@ -1,30 +1,15 @@
-import psycopg2
+from PIL import Image
+import pytesseract
 
-try:
-    # Connect to PostgreSQL
-    conn = psycopg2.connect(
-        host="your-db-host.com",
-        port=5432,
-        dbname="your_database",
-        user="your_user",
-        password="your_password"
-    )
+# Optional: path to tesseract binary (only if not in PATH)
+# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-    # Create a cursor
-    cur = conn.cursor()
+# Load image
+image = Image.open("example_image.png")
 
-    # Query: select first 10 rows from a table
-    cur.execute("SELECT * FROM your_table_name LIMIT 10;")
+# Perform OCR
+text = pytesseract.image_to_string(image)
 
-    # Fetch and print results
-    rows = cur.fetchall()
-    print("📋 First 10 Records:")
-    for row in rows:
-        print(row)
-
-    # Clean up
-    cur.close()
-    conn.close()
-
-except Exception as e:
-    print("❌ Error querying the database:", e)
+# Show result
+print("📝 Extracted Text:")
+print(text)
