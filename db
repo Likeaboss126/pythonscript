@@ -1,25 +1,26 @@
 import psycopg2
 
-# Set up connection parameters
-conn = psycopg2.connect(
-    host="your-db-host.com",
-    port=5432,
-    dbname="your_database",
-    user="your_user",
-    password="your_password",
+try:
+    # Connect to PostgreSQL
+    conn = psycopg2.connect(
+        host="your-db-host.com",     # e.g., "localhost" or an IP address
+        port=5432,                   # Default PostgreSQL port
+        dbname="your_database",
+        user="your_user",
+        password="your_password"
+    )
 
-    # SSL/TLS certificate paths
-    sslmode="verify-full",                    # Options: disable, require, verify-ca, verify-full
-    sslrootcert="/path/to/root.crt",          # Server CA certificate
-    sslcert="/path/to/client.crt",            # Client certificate
-    sslkey="/path/to/client.key"              # Client private key
-)
+    # Create a cursor
+    cur = conn.cursor()
 
-# Example query
-cur = conn.cursor()
-cur.execute("SELECT version();")
-print(cur.fetchone())
+    # Run a simple query
+    cur.execute("SELECT version();")
+    db_version = cur.fetchone()
+    print("Connected to:", db_version)
 
-# Clean up
-cur.close()
-conn.close()
+    # Clean up
+    cur.close()
+    conn.close()
+
+except Exception as e:
+    print("❌ Failed to connect to the database:", e)
