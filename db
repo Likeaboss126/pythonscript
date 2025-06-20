@@ -1,15 +1,18 @@
-from PIL import Image
-import pytesseract
+import psycopg2
 
-# Optional: path to tesseract binary (only if not in PATH)
-# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+@st.cache_data
+def load_data():
+    conn = psycopg2.connect(
+        host="localhost",
+        port=5432,
+        database="your_database",
+        user="your_user",
+        password="your_password"
+    )
+    query = "SELECT * FROM your_table;"
+    df = pd.read_sql(query, conn)
+    df["DateTime"] = pd.to_datetime(df["DateTime"])
+    conn.close()
+    return df
 
-# Load image
-image = Image.open("example_image.png")
-
-# Perform OCR
-text = pytesseract.image_to_string(image)
-
-# Show result
-print("📝 Extracted Text:")
-print(text)
+df = load_data()
