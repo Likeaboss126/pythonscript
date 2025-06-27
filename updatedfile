@@ -1,154 +1,115 @@
 import streamlit as st
 import pandas as pd
+import psycopg2
 import plotly.express as px
-import datetime
 
 # ------------------------ PAGE CONFIG ------------------------
-st.set_page_config(page_title="API Monitoring Dashboard", layout="wide")
-st.title("📊 API Monitoring Dashboard")
+st.set_page_config(page_title="API Performance Dashboard", layout="wide")
+st.title("📊 API Performance Dashboard (PostgreSQL)")
 
-# ------------------------ LOAD SAMPLE CSV DATA ------------------------
+# ------------------------ DATABASE CONNECTION ------------------------
+@st.cache_resource
+def get_connection():
+    return psycopg2.connect(
+        dbname="your_dbname",
+        user="your_user",
+        password="your_password",
+        host="your_host",
+        port="5432"  # Change if needed
+    )
+
 @st.cache_data
-def load_sample_data():
-    import random
-    import numpy as np
-    dates = pd.date_range(end=datetime.date.today(), periods=180)
-    data = []
-    functionalities = ['Login', 'Search', 'Payment']
-    apis = ['auth/login', 'query/search', 'txn/pay']
-    for date in dates:
-        for func, api in zip(functionalities, apis):
-            for _ in range(3):
-                resp_time = random.randint(100, 2000)
-                status = random.choices(['Success', 'Failed'], weights=[90, 10])[0]
-                err = "Timeout" if status == 'Failed' else ""
-                data.append([date, func, api, resp_time, status, err])
-    df = pd.DataFrame(data, columns=['DateTime', 'Functionality', 'API', 'ResponseTime', 'Status', 'ErrorMessage'])
-    return df
+def load_data():
+    try:
+        conn = get_connection()
+        query = "SELECT * FROM data;"
+        df = pd.read_sql(query, conn)
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
 
-df = load_sample_data()
+df = load_data()
+
+if df.empty:
+    st.stop()
 
 # ------------------------ FILTERS ------------------------
 st.sidebar.header("🔎 Filters")
-
 all_funcs = df['Functionality'].unique().tolist()
 all_apis = df['API'].unique().tolist()
 
-selected_funcs = st.sidebar.multiselect("Select Functionality", all_funcs, default=all_funcs[0:1], key="selected_funcs")
+selected_funcs = st.sidebar.multiselect("Select Functionality", all_funcs, default=all_funcs[0:1])
 filtered_apis = df[df['Functionality'].isin(selected_funcs)]['API'].unique().tolist()
-selected_apis = st.sidebar.multiselect("Select API", filtered_apis, default=filtered_apis[0:1], key="selected_apis")
+selected_apis = st.sidebar.multiselect("Select API", filtered_apis, default=filtered_apis[0:1])
 
-range_days = {
-    "Last 7 Days": 7,
-    "Last 30 Days": 30,
-    "Last 60 Days": 60,
-    "Last 90 Days": 90,
-    "Last 180 Days": 180
-}
-time_range = st.sidebar.selectbox("Select Time Range", list(range_days.keys()), index=0)
-today = datetime.date.today()
-start_date = today - datetime.timedelta(days=range_days[time_range])
-end_date = today
-
-if st.sidebar.button("🔄 Reset Filters"):
-    st.session_state.selected_funcs = all_funcs[0:1]
-    st.session_state.selected_apis = filtered_apis[0:1]
-    st.experimental_rerun()
-
-# ------------------------ FILTERED DATA ------------------------
-mask = (
-    (df['Functionality'].isin(selected_funcs)) &
-    (df['API'].isin(selected_apis)) &
-    (df['DateTime'].dt.date.between(start_date, end_date))
-)
-df_filtered = df[mask]
+df_filtered = df[(df['Functionality'].isin(selected_funcs)) & (df['API'].isin(selected_apis))]
 
 # ------------------------ TABS ------------------------
-tabs = st.tabs(["📊 Dashboard", "📈 Weekly Comparison"])
+tabs = st.tabs(["📊 Dashboard", "📈 API Performance Change"])
 
 # ------------------------ MAIN DASHBOARD TAB ------------------------
 with tabs[0]:
-    # KPI SUMMARY
-    st.subheader("📊 KPI Summary")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total API Calls", df_filtered.shape[0])
-    col2.metric("Failures", df_filtered[df_filtered['Status'] == 'Failed'].shape[0])
-    col3.metric("Avg Response Time", f"{df_filtered['ResponseTime'].mean():.2f} ms")
-    api_with_max_failures = df_filtered[df_filtered['Status'] == 'Failed']['API'].value_counts().idxmax() if not df_filtered[df_filtered['Status'] == 'Failed'].empty else "N/A"
-    col4.metric("Most Failing API", api_with_max_failures)
-
-    # MAIN CHART
-    st.subheader("📈 API Response Times")
     if not df_filtered.empty:
-        df_filtered['Date'] = pd.to_datetime(df_filtered['DateTime']).dt.date
-        avg_response = df_filtered.groupby(['Date', 'API'])['ResponseTime'].mean().reset_index()
-        fig = px.line(avg_response, x='Date', y='ResponseTime', color='API', markers=True,
-                      title="Average Response Time per Day")
+        # KPI Summary
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total API Calls", int(df_filtered["Total"].sum()))
+        col2.metric("Success", int(df_filtered["OK"].sum()))
+        col3.metric("Failures", int(df_filtered["KO"].sum()))
+
+        # Bar Chart
+        st.subheader("📊 Average Time Taken by API")
+        fig = px.bar(df_filtered, x="API", y="Averagetimetaken", color="Functionality", 
+                     barmode="group", title="Average Time Taken (ms)")
         st.plotly_chart(fig, use_container_width=True)
+
+        # Show Table
+        st.subheader("📄 Detailed API Stats")
+        st.dataframe(df_filtered.sort_values(by="API"), use_container_width=True)
     else:
-        st.info("No data available for the selected filters.")
+        st.warning("No data matches the selected filters.")
 
-    # TREND INDICATORS
-    st.subheader("📈 Weekly Trend Indicators")
-    this_week = today - datetime.timedelta(days=7)
-    last_week = today - datetime.timedelta(days=14)
-
-    this_week_df = df[(df['DateTime'].dt.date >= this_week) & (df['DateTime'].dt.date < today)]
-    last_week_df = df[(df['DateTime'].dt.date >= last_week) & (df['DateTime'].dt.date < this_week)]
-
-    st.markdown("#### API Performance Change (Week-over-Week)")
-    trend_data = []
-    for api in selected_apis:
-        this_avg = this_week_df[this_week_df['API'] == api]['ResponseTime'].mean()
-        last_avg = last_week_df[last_week_df['API'] == api]['ResponseTime'].mean()
-        if pd.notnull(this_avg) and pd.notnull(last_avg):
-            change_pct = ((this_avg - last_avg) / last_avg) * 100
-            if abs(change_pct) >= 2:
-                status = "Degraded" if change_pct > 0 else "Improved"
-                trend_data.append(f"➡️ **{api}** performance {status} by {abs(change_pct):.2f}%")
-
-    if trend_data:
-        for t in trend_data:
-            st.markdown(t)
-    else:
-        st.info("No significant changes (≥2%) in API performance this week.")
-
-    # RAW DATA
-    with st.expander("📄 Show Raw Data", expanded=False):
-        st.dataframe(df_filtered, use_container_width=True)
-
-# ------------------------ WEEKLY COMPARISON TAB ------------------------
+# ------------------------ PERFORMANCE CHANGE TAB ------------------------
 with tabs[1]:
-    st.subheader("📅 Weekly Comparison")
-    df['Week'] = df['DateTime'].dt.to_period('W').apply(lambda r: r.start_time.date())
-    weeks_available = sorted(df['Week'].unique(), reverse=True)
+    st.subheader("📅 Weekly API Performance Change")
+    if 'Week' not in df.columns:
+        st.warning("Week data not available in the current dataset.")
+    else:
+        df['Week'] = pd.to_datetime(df['Week']) if not pd.api.types.is_datetime64_any_dtype(df['Week']) else df['Week']
+        weeks_available = sorted(df['Week'].unique(), reverse=True)
 
-    col1, col2 = st.columns(2)
-    week1 = col1.selectbox("Select Week 1", weeks_available, index=1)
-    week2 = col2.selectbox("Select Week 2", weeks_available, index=0)
+        if len(weeks_available) < 2:
+            st.warning("Not enough weeks available for comparison.")
+        else:
+            col1, col2 = st.columns(2)
+            week1 = col1.selectbox("Select Week 1", weeks_available, index=1)
+            week2 = col2.selectbox("Select Week 2", weeks_available, index=0)
 
-    df_week1 = df[(df['Week'] == week1) & (df['API'].isin(selected_apis))]
-    df_week2 = df[(df['Week'] == week2) & (df['API'].isin(selected_apis))]
+            df_w1 = df[(df['Week'] == week1) & (df['API'].isin(selected_apis))]
+            df_w2 = df[(df['Week'] == week2) & (df['API'].isin(selected_apis))]
 
-    def get_week_summary(dfw, week):
-        summary = []
-        for api in selected_apis:
-            data = dfw[dfw['API'] == api]
-            if data.empty:
-                continue
-            summary.append({
-                'API': api,
-                'Week': str(week),
-                'Fastest (ms)': data['ResponseTime'].min(),
-                'Slowest (ms)': data['ResponseTime'].max(),
-                'Failures': data[data['Status'] == 'Failed'].shape[0],
-                'Average (ms)': round(data['ResponseTime'].mean(), 2)
-            })
-        return pd.DataFrame(summary)
+            summary = []
+            for api in selected_apis:
+                w1_data = df_w1[df_w1['API'] == api]
+                w2_data = df_w2[df_w2['API'] == api]
+                if w1_data.empty or w2_data.empty:
+                    continue
+                avg1 = w1_data['Averagetimetaken'].mean()
+                avg2 = w2_data['Averagetimetaken'].mean()
+                change = ((avg2 - avg1) / avg1) * 100
+                direction = "Improved by" if change < -2 else ("Degraded by" if change > 2 else "No significant change")
+                summary.append({
+                    'API': api,
+                    'Week 1': str(week1),
+                    'Week 2': str(week2),
+                    'Avg Week 1': round(avg1, 2),
+                    'Avg Week 2': round(avg2, 2),
+                    'Change': f"{direction} {abs(change):.2f}%" if direction != "No significant change" else direction
+                })
 
-    df_summary = pd.concat([
-        get_week_summary(df_week1, week1),
-        get_week_summary(df_week2, week2)
-    ])
-
-    st.dataframe(df_summary.sort_values("API"), use_container_width=True)
+            if summary:
+                df_summary = pd.DataFrame(summary)
+                st.dataframe(df_summary.sort_values("API"), use_container_width=True)
+            else:
+                st.info("No common API data available for both weeks.")
