@@ -40,9 +40,20 @@ st.sidebar.header("🔎 Filters")
 all_funcs = df['Functionality'].unique().tolist()
 all_apis = df['API'].unique().tolist()
 
-selected_funcs = st.sidebar.multiselect("Select Functionality", all_funcs, default=all_funcs[0:1])
-filtered_apis = df[df['Functionality'].isin(selected_funcs)]['API'].unique().tolist()
-selected_apis = st.sidebar.multiselect("Select API", filtered_apis, default=filtered_apis[0:1])
+if 'reset' not in st.session_state:
+    st.session_state.reset = False
+
+if st.sidebar.button("🔄 Reset Filters"):
+    st.session_state.reset = True
+
+if st.session_state.reset:
+    selected_funcs = all_funcs[0:1]
+    selected_apis = df[df['Functionality'].isin(selected_funcs)]['API'].unique().tolist()[0:1]
+    st.session_state.reset = False
+else:
+    selected_funcs = st.sidebar.multiselect("Select Functionality", all_funcs, default=all_funcs[0:1], key="selected_funcs")
+    filtered_apis = df[df['Functionality'].isin(selected_funcs)]['API'].unique().tolist()
+    selected_apis = st.sidebar.multiselect("Select API", filtered_apis, default=filtered_apis[0:1], key="selected_apis")
 
 df_filtered = df[(df['Functionality'].isin(selected_funcs)) & (df['API'].isin(selected_apis))]
 
