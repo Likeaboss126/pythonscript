@@ -1,52 +1,71 @@
-import pdfplumber
+import cv2
+import numpy as np
+import easyocr
 import pandas as pd
-from itertools import groupby
+import matplotlib.pyplot as plt
 
-def extract_tables_from_unstructured_pdf(pdf_path, page_num):
-    tables = []
+# Load the image
+image_path = "table_image.jpg"
+image = cv2.imread(image_path)
+gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    with pdfplumber.open(pdf_path) as pdf:
-        page = pdf.pages[page_num]
+# Thresholding the image
+_, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
 
-        # Get all words with x, y positions
-        words = page.extract_words(use_text_flow=True)
+# Detect horizontal and vertical lines
+h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
+v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
 
-        # Group by 'top' (Y coordinate), rounded for tolerance
-        lines = {}
-        for w in words:
-            y = round(w['top'], 1)
-            lines.setdefault(y, []).append(w)
+h_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, h_kernel, iterations=2)
+v_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, v_kernel, iterations=2)
 
-        # Sort lines top-down
-        sorted_lines = sorted(lines.items(), key=lambda x: x[0])
+# Combine lines to form a table grid
+table_mask = cv2.add(h_lines, v_lines)
 
-        current_table = []
-        for i, (y, line_words) in enumerate(sorted_lines):
-            text_line = [w['text'] for w in sorted(line_words, key=lambda w: w['x0'])]
+# Find contours = potential cell blocks
+contours, _ = cv2.findContours(table_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-            # Detect table breaks using spacing patterns or row length changes
-            if (
-                current_table and
-                (len(text_line) != len(current_table[-1]) or y - list(lines.keys())[i - 1] > 20)
-            ):
-                # New table detected, save current one
-                if len(current_table) > 1:
-                    tables.append(pd.DataFrame(current_table[1:], columns=current_table[0]))
-                current_table = []
+# Prepare EasyOCR
+reader = easyocr.Reader(['en'], gpu=False)
 
-            current_table.append(text_line)
+# Sort contours top-to-bottom, left-to-right
+cells = []
+for cnt in contours:
+    x, y, w, h = cv2.boundingRect(cnt)
+    if w > 30 and h > 20:  # ignore noise
+        cells.append((x, y, w, h))
 
-        # Save the last table
-        if len(current_table) > 1:
-            tables.append(pd.DataFrame(current_table[1:], columns=current_table[0]))
+# Sort cells into rows and columns
+cells = sorted(cells, key=lambda b: (b[1], b[0]))  # y (row), then x (column)
 
-    return tables
+# Group cells into rows
+rows = []
+current_row = []
+threshold = 15  # pixel tolerance for y-coordinate similarity
 
-# 🔧 Usage
-pdf_path = "fake_table_unstructured.pdf"  # Replace with your actual file
-tables = extract_tables_from_unstructured_pdf(pdf_path, page_num=0)
+for i, cell in enumerate(cells):
+    if i == 0:
+        current_row.append(cell)
+        continue
+    prev_y = cells[i - 1][1]
+    curr_y = cell[1]
+    if abs(curr_y - prev_y) <= threshold:
+        current_row.append(cell)
+    else:
+        rows.append(sorted(current_row, key=lambda b: b[0]))  # sort row by x
+        current_row = [cell]
+rows.append(sorted(current_row, key=lambda b: b[0]))  # last row
 
-# Display result
-for i, df in enumerate(tables):
-    print(f"\n--- Table {i+1} ---")
-    print(df)
+# OCR each cell
+table_data = []
+for row in rows:
+    row_data = []
+    for x, y, w, h in row:
+        cell_img = image[y:y + h, x:x + w]
+        text = reader.readtext(cell_img, detail=0)
+        row_data.append(" ".join(text).strip())
+    table_data.append(row_data)
+
+# Convert to DataFrame
+df = pd.DataFrame(table_data)
+print(df)
