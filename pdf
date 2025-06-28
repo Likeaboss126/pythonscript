@@ -1,0 +1,37 @@
+import pdfplumber
+import pandas as pd
+
+pdf = pdfplumber.open("PopFacts_2019-6.pdf")
+
+# Suppose Table 1 is on page 4 (you can adjust the page number)
+page = pdf.pages[3]
+
+# Extract all words with positions
+words = page.extract_words()
+
+# Filter words within the approximate Y-coordinate range of the table rows
+ys = [float(w['top']) for w in words]
+table_top = min(ys) + 100   # adjust offset
+table_bot = max(ys) - 100
+
+table_words = [w for w in words if table_top < float(w['top']) < table_bot]
+
+# Group rows by Y coordinate (rounded)
+rows = {}
+for w in table_words:
+    y = round(float(w['top']), 1)
+    rows.setdefault(y, []).append(w)
+
+# Sort rows by Y (top to bottom), then sort words within each row by X
+data = []
+for y in sorted(rows):
+    row = rows[y]
+    row_sorted = sorted(row, key=lambda w: float(w['x0']))
+    data.append([w['text'] for w in row_sorted])
+
+# Convert to DataFrame (adjust column count)
+df = pd.DataFrame(data[1:], columns=data[0])
+print(df)
+
+# Save to CSV
+df.to_csv("table1.csv", index=False)
