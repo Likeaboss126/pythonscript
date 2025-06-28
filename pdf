@@ -1,37 +1,52 @@
 import pdfplumber
 import pandas as pd
+from itertools import groupby
 
-pdf = pdfplumber.open("PopFacts_2019-6.pdf")
+def extract_tables_from_unstructured_pdf(pdf_path, page_num):
+    tables = []
 
-# Suppose Table 1 is on page 4 (you can adjust the page number)
-page = pdf.pages[3]
+    with pdfplumber.open(pdf_path) as pdf:
+        page = pdf.pages[page_num]
 
-# Extract all words with positions
-words = page.extract_words()
+        # Get all words with x, y positions
+        words = page.extract_words(use_text_flow=True)
 
-# Filter words within the approximate Y-coordinate range of the table rows
-ys = [float(w['top']) for w in words]
-table_top = min(ys) + 100   # adjust offset
-table_bot = max(ys) - 100
+        # Group by 'top' (Y coordinate), rounded for tolerance
+        lines = {}
+        for w in words:
+            y = round(w['top'], 1)
+            lines.setdefault(y, []).append(w)
 
-table_words = [w for w in words if table_top < float(w['top']) < table_bot]
+        # Sort lines top-down
+        sorted_lines = sorted(lines.items(), key=lambda x: x[0])
 
-# Group rows by Y coordinate (rounded)
-rows = {}
-for w in table_words:
-    y = round(float(w['top']), 1)
-    rows.setdefault(y, []).append(w)
+        current_table = []
+        for i, (y, line_words) in enumerate(sorted_lines):
+            text_line = [w['text'] for w in sorted(line_words, key=lambda w: w['x0'])]
 
-# Sort rows by Y (top to bottom), then sort words within each row by X
-data = []
-for y in sorted(rows):
-    row = rows[y]
-    row_sorted = sorted(row, key=lambda w: float(w['x0']))
-    data.append([w['text'] for w in row_sorted])
+            # Detect table breaks using spacing patterns or row length changes
+            if (
+                current_table and
+                (len(text_line) != len(current_table[-1]) or y - list(lines.keys())[i - 1] > 20)
+            ):
+                # New table detected, save current one
+                if len(current_table) > 1:
+                    tables.append(pd.DataFrame(current_table[1:], columns=current_table[0]))
+                current_table = []
 
-# Convert to DataFrame (adjust column count)
-df = pd.DataFrame(data[1:], columns=data[0])
-print(df)
+            current_table.append(text_line)
 
-# Save to CSV
-df.to_csv("table1.csv", index=False)
+        # Save the last table
+        if len(current_table) > 1:
+            tables.append(pd.DataFrame(current_table[1:], columns=current_table[0]))
+
+    return tables
+
+# 🔧 Usage
+pdf_path = "fake_table_unstructured.pdf"  # Replace with your actual file
+tables = extract_tables_from_unstructured_pdf(pdf_path, page_num=0)
+
+# Display result
+for i, df in enumerate(tables):
+    print(f"\n--- Table {i+1} ---")
+    print(df)
