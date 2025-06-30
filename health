@@ -6,33 +6,49 @@ import subprocess
 DB_PATH = "health.db"
 
 def get_latest_app_status():
-    conn = sqlite3.connect(DB_PATH)
     query = '''
-        SELECT
-            hs.ApplicationName,
-            MAX(hs.DateTime) AS DateTime,
-            GROUP_CONCAT(hs.APIs, ', ') AS APIs,
-            SUM(hs.Passed) AS Passed,
-            SUM(hs.Failed) AS Failed,
-            GROUP_CONCAT(hs.Error, '; ') AS Error
-        FROM health_status hs
-        INNER JOIN (
+        WITH latest_runs AS (
             SELECT ApplicationName, MAX(DateTime) AS MaxDateTime
             FROM health_status
             GROUP BY ApplicationName
-        ) latest
-        ON hs.ApplicationName = latest.ApplicationName AND hs.DateTime = latest.MaxDateTime
-        GROUP BY hs.ApplicationName
-        ORDER BY hs.ApplicationName;
+        ),
+        latest_data AS (
+            SELECT hs.*
+            FROM health_status hs
+            JOIN latest_runs lr
+            ON hs.ApplicationName = lr.ApplicationName AND hs.DateTime = lr.MaxDateTime
+        )
+        SELECT *
+        FROM latest_data
+        ORDER BY ApplicationName, DateTime
     '''
     df = pd.read_sql_query(query, conn)
     conn.close()
 
-    df["Status"] = df.apply(
-        lambda row: "✅ Passed" if row["Failed"] == 0 else f"❌ Failed - {row['Error']}",
-        axis=1
-    )
-    return df["ApplicationName"].tolist(), df
+    # Process status per application
+    status_rows = []
+    for app, group in df.groupby("ApplicationName"):
+        failed_apis = group[(group["Passed"] == 0) & (group["Failed"] > 0)]
+        error_msg = "; ".join(
+            f"{row['APIs']}: {row['Error']}"
+            for _, row in failed_apis.iterrows()
+        )
+        status = "✅ Passed" if failed_apis.empty else f"❌ Failed - {error_msg}"
+        latest_time = group["DateTime"].max()
+        total_passed = group["Passed"].sum()
+        total_failed = group["Failed"].sum()
+
+        status_rows.append({
+            "ApplicationName": app,
+            "DateTime": latest_time,
+            "Passed": total_passed,
+            "Failed": total_failed,
+            "Error": error_msg,
+            "Status": status
+        })
+
+    result_df = pd.DataFrame(status_rows)
+    return result_df["ApplicationName"].tolist(), result_df
 
 def run_health_check_script():
     subprocess.run(["python", "health_checker.py"])
