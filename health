@@ -1,47 +1,52 @@
 import streamlit as st
 import sqlite3
-import subprocess
 import pandas as pd
+import subprocess
 
 DB_PATH = "health.db"
 
-def load_latest_status():
+def get_latest_app_status():
     conn = sqlite3.connect(DB_PATH)
     query = """
-        SELECT app_name, url, status, response_time_ms, error_message, checked_at
-        FROM api_status
-        WHERE (app_name, checked_at) IN (
-            SELECT app_name, MAX(checked_at)
-            FROM api_status
-            GROUP BY app_name
-        )
-        ORDER BY app_name
+        SELECT t1.*
+        FROM health_status t1
+        INNER JOIN (
+            SELECT ApplicationName, MAX(DateTime) AS MaxDateTime
+            FROM health_status
+            GROUP BY ApplicationName
+        ) t2
+        ON t1.ApplicationName = t2.ApplicationName AND t1.DateTime = t2.MaxDateTime
+        ORDER BY t1.ApplicationName
     """
     df = pd.read_sql_query(query, conn)
     conn.close()
-    return df
+
+    # Derive Status
+    def derive_status(row):
+        if row['Failed'] == 0:
+            return "✅ Passed"
+        else:
+            return f"❌ Failed - {row['Error']}"
+
+    df["Status"] = df.apply(derive_status, axis=1)
+    return df[["ApplicationName", "DateTime", "APIs", "Passed", "Failed", "Status"]]
 
 def run_health_check_script():
     subprocess.run(["python", "health_checker.py"])
 
-# Streamlit UI
+# Streamlit App
 st.set_page_config(page_title="API Health Dashboard", layout="wide")
-st.title("🚦 API Health Checker Dashboard")
+st.title("🩺 Application Health Checker")
 
 if st.button("🔄 Run Health Check Now"):
-    st.info("Running health checks...")
+    st.info("Running health check script...")
     run_health_check_script()
-    st.success("✅ Done!")
+    st.success("Done!")
 
-df = load_latest_status()
-
-# Highlight up/down rows
-def highlight_status(row):
-    color = "#d4edda" if row["status"] == "up" else "#f8d7da"
-    return [f"background-color: {color}"] * len(row)
+df = get_latest_app_status()
 
 if not df.empty:
-    st.dataframe(df.style.apply(highlight_status, axis=1), use_container_width=True)
+    st.subheader("📊 Latest Health Check Summary")
+    st.dataframe(df, use_container_width=True)
 else:
-    st.warning("No data available yet. Click the refresh button.")
-
+    st.warning("No data found. Run the check to populate data.")
