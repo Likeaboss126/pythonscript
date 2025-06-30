@@ -7,29 +7,32 @@ DB_PATH = "health.db"
 
 def get_latest_app_status():
     conn = sqlite3.connect(DB_PATH)
-    query = """
-        SELECT t1.*
-        FROM health_status t1
+    query = '''
+        SELECT
+            hs.ApplicationName,
+            MAX(hs.DateTime) AS DateTime,
+            GROUP_CONCAT(hs.APIs, ', ') AS APIs,
+            SUM(hs.Passed) AS Passed,
+            SUM(hs.Failed) AS Failed,
+            GROUP_CONCAT(hs.Error, '; ') AS Error
+        FROM health_status hs
         INNER JOIN (
             SELECT ApplicationName, MAX(DateTime) AS MaxDateTime
             FROM health_status
             GROUP BY ApplicationName
-        ) t2
-        ON t1.ApplicationName = t2.ApplicationName AND t1.DateTime = t2.MaxDateTime
-        ORDER BY t1.ApplicationName
-    """
+        ) latest
+        ON hs.ApplicationName = latest.ApplicationName AND hs.DateTime = latest.MaxDateTime
+        GROUP BY hs.ApplicationName
+        ORDER BY hs.ApplicationName;
+    '''
     df = pd.read_sql_query(query, conn)
     conn.close()
 
-    # Derive Status
-    def derive_status(row):
-        if row['Failed'] == 0:
-            return "✅ Passed"
-        else:
-            return f"❌ Failed - {row['Error']}"
-
-    df["Status"] = df.apply(derive_status, axis=1)
-    return df[["ApplicationName", "DateTime", "APIs", "Passed", "Failed", "Status"]]
+    df["Status"] = df.apply(
+        lambda row: "✅ Passed" if row["Failed"] == 0 else f"❌ Failed - {row['Error']}",
+        axis=1
+    )
+    return df["ApplicationName"].tolist(), df
 
 def run_health_check_script():
     subprocess.run(["python", "health_checker.py"])
