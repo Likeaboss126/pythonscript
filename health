@@ -1,0 +1,47 @@
+import streamlit as st
+import sqlite3
+import subprocess
+import pandas as pd
+
+DB_PATH = "health.db"
+
+def load_latest_status():
+    conn = sqlite3.connect(DB_PATH)
+    query = """
+        SELECT app_name, url, status, response_time_ms, error_message, checked_at
+        FROM api_status
+        WHERE (app_name, checked_at) IN (
+            SELECT app_name, MAX(checked_at)
+            FROM api_status
+            GROUP BY app_name
+        )
+        ORDER BY app_name
+    """
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    return df
+
+def run_health_check_script():
+    subprocess.run(["python", "health_checker.py"])
+
+# Streamlit UI
+st.set_page_config(page_title="API Health Dashboard", layout="wide")
+st.title("🚦 API Health Checker Dashboard")
+
+if st.button("🔄 Run Health Check Now"):
+    st.info("Running health checks...")
+    run_health_check_script()
+    st.success("✅ Done!")
+
+df = load_latest_status()
+
+# Highlight up/down rows
+def highlight_status(row):
+    color = "#d4edda" if row["status"] == "up" else "#f8d7da"
+    return [f"background-color: {color}"] * len(row)
+
+if not df.empty:
+    st.dataframe(df.style.apply(highlight_status, axis=1), use_container_width=True)
+else:
+    st.warning("No data available yet. Click the refresh button.")
+
