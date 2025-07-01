@@ -22,13 +22,12 @@ def get_latest_app_status():
         FROM latest_data
         ORDER BY ApplicationName, DateTime
     '''
-    df = pd.read_sql_query(query, conn)
+     df = pd.read_sql_query(query, conn)
     conn.close()
 
     status_rows = []
 
     for func_name, group in df.groupby("Functionality"):
-        # Find failed APIs: OK == 0 and KO > 0
         failed_apis_df = group[(group["OK"] == 0) & (group["KO"] > 0)]
 
         if not failed_apis_df.empty:
@@ -47,15 +46,13 @@ def get_latest_app_status():
             "Status": status
         })
 
-    result_df = pd.DataFrame(status_rows)
-    return result_df["Functionality"].tolist(), result_df
+    return pd.DataFrame(status_rows)
 
 def run_health_check_script():
     subprocess.run(["python", "health_checker.py"])
 
 # Streamlit App
 st.set_page_config("Application Health Dashboard", layout="wide")
-
 st.title("📊 Application Health Dashboard")
 
 if st.button("🔄 Refresh"):
@@ -70,7 +67,7 @@ def color_row(val):
         return "background-color: #e6ffe6;"  # light green
     return ""
 
-# Display table with color-coded rows
+# Display with conditional formatting
 st.dataframe(
     df.style.applymap(color_row, subset=["Status"]),
     use_container_width=True
