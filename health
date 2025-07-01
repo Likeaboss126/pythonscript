@@ -25,27 +25,25 @@ def get_latest_app_status():
     df = pd.read_sql_query(query, conn)
     conn.close()
 
-    df.columns = [col.strip() for col in df.columns]
-
     status_rows = []
-    for app, group in df.groupby("Functionality"):
+
+    for func_name, group in df.groupby("Functionality"):
+        # Find failed APIs: OK == 0 and KO > 0
         failed_apis_df = group[(group["OK"] == 0) & (group["KO"] > 0)]
 
         if not failed_apis_df.empty:
-            error_msg = "; ".join(
-                f"{row['APIS']}: {row['Error']}" for _, row in failed_apis_df.iterrows()
-            )
-            status = f"❌ Failed - {error_msg}"
+            failed_apis = "; ".join(failed_apis_df["APIS"].tolist())
+            status = f"❌ Failed - {failed_apis}"
         else:
-            error_msg = ""
+            failed_apis = ""
             status = "✅ Passed"
 
         status_rows.append({
-            "Functionality": app,
+            "Functionality": func_name,
             "DateTime": group["DateTime"].max(),
             "OK": group["OK"].sum(),
             "KO": group["KO"].sum(),
-            "Error": error_msg,
+            "Failed APIs": failed_apis,
             "Status": status
         })
 
