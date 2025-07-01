@@ -11,10 +11,21 @@ import pandas as pd
 
 def get_functionality_status():
     conn = sqlite3.connect("your.db")  # Update path
+    import sqlite3
+import pandas as pd
+
+def get_functionality_status():
+    conn = sqlite3.connect("your.db")  # Update your DB path here
     query = """
-        SELECT Functionality, APIs, OK, KO, TimeTaken
-        FROM health_status
-        ORDER BY Functionality, TimeTaken
+        SELECT h.*
+        FROM health_status h
+        JOIN (
+            SELECT Functionality, MAX(RunTimestamp) AS LatestRun
+            FROM health_status
+            GROUP BY Functionality
+        ) latest
+        ON h.Functionality = latest.Functionality AND h.RunTimestamp = latest.LatestRun
+        ORDER BY h.Functionality, h.TimeTaken
     """
     df = pd.read_sql_query(query, conn)
     conn.close()
@@ -28,7 +39,7 @@ def get_functionality_status():
         total_time = group["TimeTaken"].sum()
 
         if total_ko >= 10:
-            # It's a failure
+            # Failure condition met
             last_failing_api = group[group["KO"] > 0].iloc[-1]["APIs"]
             status = f"❌ Failed - {last_failing_api}"
             error_api = last_failing_api
