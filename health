@@ -6,47 +6,47 @@ import subprocess
 DB_PATH = "health.db"
 
 def get_latest_app_status():
-    query = '''
-        WITH latest_runs AS (
-            SELECT ApplicationName, MAX(DateTime) AS MaxDateTime
-            FROM health_status
-            GROUP BY ApplicationName
-        ),
-        latest_data AS (
-            SELECT hs.*
-            FROM health_status hs
-            JOIN latest_runs lr
-            ON hs.ApplicationName = lr.ApplicationName AND hs.DateTime = lr.MaxDateTime
-        )
-        SELECT *
-        FROM latest_data
-        ORDER BY ApplicationName, DateTime
-    '''
-     df = pd.read_sql_query(query, conn)
+import sqlite3
+import pandas as pd
+
+def get_functionality_status():
+    conn = sqlite3.connect("your.db")  # Update path
+    query = """
+        SELECT Functionality, APIs, OK, KO, TimeTaken
+        FROM health_status
+        ORDER BY Functionality, TimeTaken
+    """
+    df = pd.read_sql_query(query, conn)
     conn.close()
 
-    status_rows = []
+    result = []
 
     for func_name, group in df.groupby("Functionality"):
-        failed_apis_df = group[(group["OK"] == 0) & (group["KO"] > 0)]
+        group = group.reset_index(drop=True)
+        total_ko = group["KO"].sum()
+        total_ok = group["OK"].sum()
+        total_time = group["TimeTaken"].sum()
 
-        if not failed_apis_df.empty:
-            failed_apis = "; ".join(failed_apis_df["APIS"].tolist())
-            status = f"❌ Failed - {failed_apis}"
+        if total_ko >= 10:
+            # It's a failure
+            last_failing_api = group[group["KO"] > 0].iloc[-1]["APIs"]
+            status = f"❌ Failed - {last_failing_api}"
+            error_api = last_failing_api
         else:
-            failed_apis = ""
             status = "✅ Passed"
+            error_api = ""
 
-        status_rows.append({
+        result.append({
             "Functionality": func_name,
-            "DateTime": group["DateTime"].max(),
-            "OK": group["OK"].sum(),
-            "KO": group["KO"].sum(),
-            "Failed APIs": failed_apis,
-            "Status": status
+            "OK": int(total_ok),
+            "KO": int(total_ko),
+            "TimeTaken": round(total_time, 2),
+            "Status": status,
+            "Error API": error_api
         })
 
-    return pd.DataFrame(status_rows)
+    return pd.DataFrame(result)
+
 
 def run_health_check_script():
     subprocess.run(["python", "health_checker.py"])
