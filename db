@@ -1,18 +1,18 @@
-import psycopg2
+⬆️"
+⬇️
 
-@st.cache_data
-def load_data():
-    conn = psycopg2.connect(
-        host="localhost",
-        port=5432,
-        database="your_database",
-        user="your_user",
-        password="your_password"
-    )
-    query = "SELECT * FROM your_table;"
-    df = pd.read_sql(query, conn)
-    df["DateTime"] = pd.to_datetime(df["DateTime"])
-    conn.close()
-    return df
+if summary:
+    df_summary = pd.DataFrame(summary)
 
-df = load_data()
+    def highlight_row(row):
+        color = ''
+        if row['Status'] == 'improved':
+            color = 'background-color: #d4edda;'  # light green
+        elif row['Status'] == 'degraded':
+            color = 'background-color: #f8d7da;'  # light red
+        return [color] * len(row)
+
+    styled_df = df_summary.drop(columns=["Status"]).style.apply(highlight_row, axis=1)
+    st.dataframe(styled_df, use_container_width=True)
+else:
+    st.info("No common API data available for both weeks.")
