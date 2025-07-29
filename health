@@ -1,45 +1,36 @@
-openssl pkcs12 -export \
-  -inkey client.key \
-  -in client.crt \
-  -certfile root.pem \
-  -out client-keystore.p12 \
-  -name client \
-  -passout pass:changeit
+import java.io.*;
+import java.util.zip.*;
 
+public class ZipReader {
+    public static void main(String[] args) throws IOException {
+        String zipFilePath = "yourfile.zip"; // Replace with your .zip file
 
-keytool -import \
-  -alias rootca \
-  -file root.pem \
-  -keystore root-truststore.p12 \
-  -storetype PKCS12 \
-  -storepass changeit \
-  -noprompt
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFilePath))) {
+            ZipEntry entry;
 
-keytool -list -v -keystore client-keystore.p12 -storetype PKCS12 -storepass changeit
-keytool -list -v -keystore root-truststore.p12 -storetype PKCS12 -storepass changeit
+            System.out.println("🔍 .png files in the zip:");
+            while ((entry = zis.getNextEntry()) != null) {
+                String name = entry.getName();
 
-PrivateKeyEntry in client-keystore.p12
+                // List .png files
+                if (name.toLowerCase().endsWith(".png")) {
+                    System.out.println(" - " + name);
+                }
 
-trustedCertEntry in root-truststore.p12
+                // Read note.txt content
+                if (name.equalsIgnoreCase("note.txt")) {
+                    System.out.println("\n📄 note.txt content:");
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(zis));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.out.println(line);
+                    }
+                }
 
- System.setProperty("javax.net.ssl.keyStore", "client-keystore.p12");
-        System.setProperty("javax.net.ssl.keyStoreType", "PKCS12");
-        System.setProperty("javax.net.ssl.keyStorePassword", "changeit");
-
-        System.setProperty("javax.net.ssl.trustStore", "root-truststore.p12");
-        System.setProperty("javax.net.ssl.trustStoreType", "PKCS12");
-        System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
-
-        // JDBC URL (replace with your values)
-        String url = "jdbc:postgresql://your-db-host:5432/yourdb?ssl=true&sslmode=verify-ca";
-
-        Properties props = new Properties();
-        props.setProperty("user", "USERNAME");  // MUST match CN in client.crt
-
-        try (Connection conn = DriverManager.getConnection(url, props)) {
-            System.out.println("✅ Connected successfully with SSL and client cert.");
+                zis.closeEntry();
+            }
+        } catch (IOException e) {
+            System.err.println("Error reading zip file: " + e.getMessage());
         }
-
-
-
-Run openssl x509 -in client.crt -noout -subject and ensure CN= matches JDBC user
+    }
+}
