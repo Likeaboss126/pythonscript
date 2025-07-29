@@ -1,85 +1,45 @@
-import streamlit as st
-import sqlite3
-import pandas as pd
-import subprocess
-
-DB_PATH = "health.db"
-
-def get_latest_app_status():
-import sqlite3
-import pandas as pd
-
-def get_functionality_status():
-    conn = sqlite3.connect("your.db")  # Update path
-    import sqlite3
-import pandas as pd
-
-def get_functionality_status():
-    conn = sqlite3.connect("your.db")  # Update your DB path here
-    query = """
-        SELECT h.*
-        FROM health_status h
-        JOIN (
-            SELECT Functionality, MAX(RunTimestamp) AS LatestRun
-            FROM health_status
-            GROUP BY Functionality
-        ) latest
-        ON h.Functionality = latest.Functionality AND h.RunTimestamp = latest.LatestRun
-        ORDER BY h.Functionality, h.TimeTaken
-    """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-
-    result = []
-
-    for func_name, group in df.groupby("Functionality"):
-        group = group.reset_index(drop=True)
-        total_ko = group["KO"].sum()
-        total_ok = group["OK"].sum()
-        total_time = group["TimeTaken"].sum()
-
-        if total_ko >= 10:
-            # Failure condition met
-            last_failing_api = group[group["KO"] > 0].iloc[-1]["APIs"]
-            status = f"❌ Failed - {last_failing_api}"
-            error_api = last_failing_api
-        else:
-            status = "✅ Passed"
-            error_api = ""
-
-        result.append({
-            "Functionality": func_name,
-            "OK": int(total_ok),
-            "KO": int(total_ko),
-            "TimeTaken": round(total_time, 2),
-            "Status": status,
-            "Error API": error_api
-        })
-
-    return pd.DataFrame(result)
+openssl pkcs12 -export \
+  -inkey client.key \
+  -in client.crt \
+  -certfile root.pem \
+  -out client-keystore.p12 \
+  -name client \
+  -passout pass:changeit
 
 
-def run_health_check_script():
-    subprocess.run(["python", "health_checker.py"])
+keytool -import \
+  -alias rootca \
+  -file root.pem \
+  -keystore root-truststore.p12 \
+  -storetype PKCS12 \
+  -storepass changeit \
+  -noprompt
 
-# Streamlit App
-st.set_page_config("Application Health Dashboard", layout="wide")
-st.title("📊 Application Health Dashboard")
+keytool -list -v -keystore client-keystore.p12 -storetype PKCS12 -storepass changeit
+keytool -list -v -keystore root-truststore.p12 -storetype PKCS12 -storepass changeit
 
-if st.button("🔄 Refresh"):
-    st.experimental_rerun()
+PrivateKeyEntry in client-keystore.p12
 
-df = get_latest_app_status()
+trustedCertEntry in root-truststore.p12
 
-def color_row(val):
-    if val.startswith("❌"):
-        return "background-color: #ffe6e6;"  # light red
-    elif val.startswith("✅"):
-        return "background-color: #e6ffe6;"  # light green
-    return ""
+ System.setProperty("javax.net.ssl.keyStore", "client-keystore.p12");
+        System.setProperty("javax.net.ssl.keyStoreType", "PKCS12");
+        System.setProperty("javax.net.ssl.keyStorePassword", "changeit");
 
-# Display with conditional formatting
-st.dataframe(
-    df.style.applymap(color_row, subset=["Status"]),
-    use_container_width=True
-)
+        System.setProperty("javax.net.ssl.trustStore", "root-truststore.p12");
+        System.setProperty("javax.net.ssl.trustStoreType", "PKCS12");
+        System.setProperty("javax.net.ssl.trustStorePassword", "changeit");
+
+        // JDBC URL (replace with your values)
+        String url = "jdbc:postgresql://your-db-host:5432/yourdb?ssl=true&sslmode=verify-ca";
+
+        Properties props = new Properties();
+        props.setProperty("user", "USERNAME");  // MUST match CN in client.crt
+
+        try (Connection conn = DriverManager.getConnection(url, props)) {
+            System.out.println("✅ Connected successfully with SSL and client cert.");
+        }
+
+
+
+Run openssl x509 -in client.crt -noout -subject and ensure CN= matches JDBC user
