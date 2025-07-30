@@ -1,36 +1,38 @@
-import java.io.*;
-import java.util.zip.*;
+public static void main(String[] args) {
+        String url = "jdbc:mysql://localhost:3306/your_database";
+        String user = "your_username";
+        String password = "your_password";
 
-public class ZipReader {
-    public static void main(String[] args) throws IOException {
-        String zipFilePath = "yourfile.zip"; // Replace with your .zip file
+        String query = "SELECT * FROM your_table";
 
-        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFilePath))) {
-            ZipEntry entry;
+        try (
+            Connection conn = DriverManager.getConnection(url, user, password);
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(query)
+        ) {
+            List<Map<String, Object>> rows = new ArrayList<>();
 
-            System.out.println("🔍 .png files in the zip:");
-            while ((entry = zis.getNextEntry()) != null) {
-                String name = entry.getName();
+            ResultSetMetaData metaData = rs.getMetaData();
+            int columnCount = metaData.getColumnCount();
 
-                // List .png files
-                if (name.toLowerCase().endsWith(".png")) {
-                    System.out.println(" - " + name);
+            while (rs.next()) {
+                Map<String, Object> rowMap = new HashMap<>();
+
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = metaData.getColumnName(i);
+                    Object value = rs.getObject(i);
+                    rowMap.put(columnName, value);
                 }
 
-                // Read note.txt content
-                if (name.equalsIgnoreCase("note.txt")) {
-                    System.out.println("\n📄 note.txt content:");
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(zis));
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        System.out.println(line);
-                    }
-                }
-
-                zis.closeEntry();
+                rows.add(rowMap);
             }
-        } catch (IOException e) {
-            System.err.println("Error reading zip file: " + e.getMessage());
+
+            // Example: print all rows
+            for (Map<String, Object> row : rows) {
+                System.out.println(row);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
-}
