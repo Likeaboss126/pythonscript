@@ -1,18 +1,12 @@
-⬆️"
-⬇️
+DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-if summary:
-    df_summary = pd.DataFrame(summary)
+        // Parse start and end date with assumed times
+        LocalDateTime startDateTime = LocalDate.parse(startDateStr, dateFormatter).atStartOfDay(); // 00:00
+        LocalDateTime endDateTime = LocalDate.parse(endDateStr, dateFormatter).atTime(LocalTime.of(23, 59)); // 23:59
 
-    def highlight_row(row):
-        color = ''
-        if row['Status'] == 'improved':
-            color = 'background-color: #d4edda;'  # light green
-        elif row['Status'] == 'degraded':
-            color = 'background-color: #f8d7da;'  # light red
-        return [color] * len(row)
+        // Parse the target datetime
+        LocalDateTime checkDateTime = LocalDateTime.parse(checkDateStr, dateTimeFormatter);
 
-    styled_df = df_summary.drop(columns=["Status"]).style.apply(highlight_row, axis=1)
-    st.dataframe(styled_df, use_container_width=True)
-else:
-    st.info("No common API data available for both weeks.")
+        // Comparison
+        return !checkDateTime.isBefore(startDateTime) && !checkDateTime.isAfter(endDateTime);
