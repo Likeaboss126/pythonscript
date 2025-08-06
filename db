@@ -5,9 +5,14 @@ WHERE NOT EXISTS (
     FROM table2 t2
     WHERE t2.employee_id = t1.employee_id
 )
+AND EXISTS (
+    SELECT 1
+    FROM table3 t3
+    WHERE t3.employee_id = t1.employee_id
+)
 AND NOT EXISTS (
     SELECT 1
     FROM table3 t3
     WHERE t3.employee_id = t1.employee_id
-    AND t3.status <> 'completed'
+      AND t3.status <> 'completed'
 );
