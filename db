@@ -1,6 +1,13 @@
-SELECT 
-  CASE 
-    WHEN col1 IS NOT NULL AND col2 IS NOT NULL THEN col1 || '-' || col2
-    ELSE NULL
-  END AS combined_value
-FROM your_table;
+SELECT *
+FROM table1 t1
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM table2 t2
+    WHERE t2.employee_id = t1.employee_id
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM table3 t3
+    WHERE t3.employee_id = t1.employee_id
+    AND t3.status <> 'completed'
+);
