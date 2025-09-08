@@ -1,18 +1,42 @@
-SELECT *
-FROM table1 t1
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM table2 t2
-    WHERE t2.employee_id = t1.employee_id
-)
-AND EXISTS (
-    SELECT 1
-    FROM table3 t3
-    WHERE t3.employee_id = t1.employee_id
-)
-AND NOT EXISTS (
-    SELECT 1
-    FROM table3 t3
-    WHERE t3.employee_id = t1.employee_id
-      AND t3.status <> 'completed'
-);
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.io.FileWriter;
+
+public class AxeReportGenerator {
+    public static void main(String[] args) throws Exception {
+        String content = new String(Files.readAllBytes(Paths.get("accessibilityReport.json")));
+        JSONObject report = new JSONObject(content);
+
+        StringBuilder html = new StringBuilder();
+        html.append("<html><head><title>Accessibility Report</title></head><body>");
+        html.append("<h1>Accessibility Violations</h1><ul>");
+
+        JSONArray violations = report.getJSONArray("violations");
+        for (int i = 0; i < violations.length(); i++) {
+            JSONObject violation = violations.getJSONObject(i);
+            html.append("<li><b>")
+                .append(violation.getString("description"))
+                .append("</b> (Impact: ")
+                .append(violation.getString("impact"))
+                .append(")<br/>");
+
+            JSONArray nodes = violation.getJSONArray("nodes");
+            for (int j = 0; j < nodes.length(); j++) {
+                JSONObject node = nodes.getJSONObject(j);
+                html.append("<code>").append(node.getString("html")).append("</code><br/>");
+                html.append(node.getString("failureSummary")).append("<br/>");
+            }
+            html.append("<a href='").append(violation.getString("helpUrl"))
+                .append("'>How to fix</a><br/><br/></li>");
+        }
+        html.append("</ul></body></html>");
+
+        try (FileWriter file = new FileWriter("axe-report.html")) {
+            file.write(html.toString());
+        }
+
+        System.out.println("axe-report.html generated!");
+    }
+}
