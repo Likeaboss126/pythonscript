@@ -1,75 +1,58 @@
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.apache.commons.text.StringEscapeUtils;
-
-public class AxeHtmlReportGenerator {
-
-    public static String generateReport(JSONObject results) {
-        StringBuilder html = new StringBuilder();
-
-        html.append("<!DOCTYPE html>");
-        html.append("<html lang='en'>");
-        html.append("<head>");
-        html.append("<meta charset='UTF-8'>");
-        html.append("<title>Axe Accessibility Report</title>");
-        html.append("<style>");
-        html.append("body { font-family: Arial, sans-serif; margin: 20px; }");
-        html.append("h1 { color: #333; }");
-        html.append("table { border-collapse: collapse; width: 100%; margin-top: 20px; }");
-        html.append("table, th, td { border: 1px solid #ddd; padding: 8px; }");
-        html.append("th { background-color: #f2f2f2; }");
-        html.append("code { background: #f8f8f8; padding: 2px 4px; border-radius: 4px; display: block; }");
-        html.append("</style>");
-        html.append("</head>");
-        html.append("<body>");
-        html.append("<h1>Axe Accessibility Report</h1>");
-
-        JSONArray violations = results.getJSONArray("violations");
-
-        if (violations.isEmpty()) {
-            html.append("<p style='color: green;'>No accessibility violations found 🎉</p>");
-        } else {
-            for (int i = 0; i < violations.length(); i++) {
-                JSONObject violation = violations.getJSONObject(i);
-                html.append("<h2>").append(violation.getString("id")).append("</h2>");
-                html.append("<p><strong>Description:</strong> ").append(violation.getString("description")).append("</p>");
-                html.append("<p><strong>Help:</strong> <a href='").append(violation.getString("helpUrl"))
-                    .append("' target='_blank'>").append(violation.getString("help")).append("</a></p>");
-
-                JSONArray nodes = violation.getJSONArray("nodes");
-                html.append("<table>");
-                html.append("<tr><th>Target</th><th>HTML Snippet</th><th>Failure Summary</th></tr>");
-
-                for (int j = 0; j < nodes.length(); j++) {
-                    JSONObject node = nodes.getJSONObject(j);
-
-                    // ✅ Escape HTML so it's visible in the report
-                    String htmlSnippet = StringEscapeUtils.escapeHtml4(node.getString("html"));
-
-                    html.append("<tr>");
-                    html.append("<td>").append(node.getJSONArray("target")).append("</td>");
-                    html.append("<td><code>").append(htmlSnippet).append("</code></td>");
-                    html.append("<td>").append(node.getString("failureSummary")).append("</td>");
-                    html.append("</tr>");
-                }
-
-                html.append("</table>");
-            }
-        }
-
-        html.append("</body>");
-        html.append("</html>");
-
-        return html.toString();
-    }
-}
-
-
-
-
-<!-- Add dependency if not already present -->
-<dependency>
-  <groupId>org.apache.commons</groupId>
-  <artifactId>commons-text</artifactId>
-  <version>1.11.0</version>
-</dependency>
+Yes	Detects missing or empty alt attributes, but not meaningfulness.
+No	Requires manual verification of transcripts.
+No	Manual check needed for captions presence/accuracy.
+No	Manual testing required.
+No	Manual/operational check.
+No	Manual check.
+Yes	Checks ARIA/semantic markup issues.
+No	Requires manual review of reading order.
+No	Manual verification required.
+No	Manual testing across orientations.
+Partial	Detects autocomplete attributes, but semantic meaning may need manual.
+No	AAA not in A+AA scope.
+Partial	Can detect color-only use in some cases, often manual.
+No	Manual check required.
+Yes	Automated contrast check for text elements.
+No	Manual zoom testing required.
+Partial	Detects text in images, but judgment required.
+No	Manual zoom/reflow check required.
+Yes	Detects contrast issues for UI components.
+No	Manual testing required.
+No	Requires manual inspection.
+Partial	Detects keyboard traps, but manual needed for full coverage.
+Yes	Automated check possible.
+No	Manual validation needed.
+No	Manual check required.
+No	Manual testing required.
+No	Requires manual/visual testing.
+Partial	Detects skip links, but usability needs manual check.
+Yes	Checks if <title> element exists.
+No	Manual keyboard navigation check required.
+No	Manual judgment required.
+No	Manual inspection needed.
+Partial	Checks for missing headings/labels, meaning requires manual.
+Partial	Axe can detect missing focus indicators, but clarity requires manual.
+No	Manual test required.
+No	Manual verification required.
+No	Manual testing needed.
+No	Manual verification required.
+Yes	Axe detects mismatches between visible labels and accessible names.
+No	Manual testing required.
+No	Manual testing required.
+Partial	Some detection possible, but often manual.
+Yes	Checks for <html lang> attribute.
+Partial	Detects missing lang attributes, but correctness manual.
+No	Manual check required.
+No	Manual verification required.
+No	Manual inspection required.
+No	Manual verification required.
+No	Manual testing required.
+Partial	Some form validation issues can be detected, often manual.
+Yes	Detects missing form labels.
+No	Manual testing required.
+No	Manual verification required.
+No	Manual check required.
+No	Manual testing required.
+Yes	Detects invalid HTML/ARIA attributes.
+Yes	Automated detection of ARIA issues.
+Yes	Detects live region announcements.
