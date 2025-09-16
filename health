@@ -1,38 +1,33 @@
-public static void main(String[] args) {
-        String url = "jdbc:mysql://localhost:3306/your_database";
-        String user = "your_username";
-        String password = "your_password";
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
+import org.apache.pdfbox.pdmodel.interactive.form.PDField;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 
-        String query = "SELECT * FROM your_table";
+import java.io.File;
+import java.util.List;
 
-        try (
-            Connection conn = DriverManager.getConnection(url, user, password);
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery(query)
-        ) {
-            List<Map<String, Object>> rows = new ArrayList<>();
+public class FindSignatureBox {
+    public static void main(String[] args) throws Exception {
+        try (PDDocument document = PDDocument.load(new File("input.pdf"))) {
+            PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
 
-            ResultSetMetaData metaData = rs.getMetaData();
-            int columnCount = metaData.getColumnCount();
+            if (acroForm != null) {
+                PDField sigField = acroForm.getField("Signature1"); // field name in PDF
+                if (sigField != null) {
+                    List<PDAnnotationWidget> widgets = sigField.getWidgets();
+                    if (!widgets.isEmpty()) {
+                        PDRectangle rect = widgets.get(0).getRectangle();
+                        float x = rect.getLowerLeftX();
+                        float y = rect.getLowerLeftY();
+                        float width = rect.getWidth();
+                        float height = rect.getHeight();
 
-            while (rs.next()) {
-                Map<String, Object> rowMap = new HashMap<>();
-
-                for (int i = 1; i <= columnCount; i++) {
-                    String columnName = metaData.getColumnName(i);
-                    Object value = rs.getObject(i);
-                    rowMap.put(columnName, value);
+                        System.out.printf("Signature box coords: x=%f, y=%f, width=%f, height=%f%n",
+                                x, y, width, height);
+                    }
                 }
-
-                rows.add(rowMap);
             }
-
-            // Example: print all rows
-            for (Map<String, Object> row : rows) {
-                System.out.println(row);
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
     }
+}
