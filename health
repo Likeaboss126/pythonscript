@@ -7,8 +7,9 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.Random;
 
-public class RandomSignatureInPDF {
+public class RandomNameSignature {
     public static void main(String[] args) throws Exception {
         File inputFile = new File("input.pdf");
         File outputFile = new File("signed_output.pdf");
@@ -16,8 +17,13 @@ public class RandomSignatureInPDF {
         try (PDDocument document = PDDocument.load(inputFile)) {
             PDPage page = document.getPage(0); // first page
 
-            // ---- Step 1: Generate random signature image ----
-            int sigWidth = 200, sigHeight = 50;
+            // ---- Step 1: Pick a random name ----
+            String[] names = {"A. Sharma", "M. Gupta", "R. Verma", "S. Mehta", "K. Patel", "D. Singh"};
+            Random rand = new Random();
+            String chosenName = names[rand.nextInt(names.length)];
+
+            // ---- Step 2: Generate signature image ----
+            int sigWidth = 300, sigHeight = 100;
             BufferedImage sigImage = new BufferedImage(sigWidth, sigHeight, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = sigImage.createGraphics();
 
@@ -26,32 +32,30 @@ public class RandomSignatureInPDF {
             g2d.fillRect(0, 0, sigWidth, sigHeight);
             g2d.setComposite(AlphaComposite.SrcOver);
 
-            // draw signature strokes
-            g2d.setColor(Color.BLACK);
-            g2d.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            int x = 10, y = sigHeight / 2;
-            for (int i = 0; i < 8; i++) {
-                int dx = (int) (Math.random() * 30 + 20);
-                int dy = (int) (Math.random() * 20 - 10);
-                g2d.drawLine(x, y, x + dx, y + dy);
-                x += dx;
-                y += dy;
-                if (x > sigWidth - 10) break;
+            // pick a font (script-like if available on system)
+            Font font = new Font("Brush Script MT", Font.ITALIC, 48);
+            if (font == null) {
+                font = new Font("Serif", Font.ITALIC, 48); // fallback
             }
+
+            g2d.setFont(font);
+            g2d.setColor(Color.BLACK);
+            g2d.drawString(chosenName, 20, sigHeight / 2 + 15);
+
             g2d.dispose();
 
-            // Save temp signature PNG
+            // Save temporary signature file
             File sigFile = new File("temp_signature.png");
             ImageIO.write(sigImage, "png", sigFile);
 
-            // ---- Step 2: Load into PDF ----
+            // ---- Step 3: Load into PDF ----
             PDImageXObject pdImage = PDImageXObject.createFromFile(sigFile.getAbsolutePath(), document);
 
-            // ---- Enter your box coordinates here ----
+            // ---- Step 4: Place inside your box ----
             float xPos = 100;   // left
             float yPos = 150;   // bottom
-            float boxWidth = 200;
-            float boxHeight = 50;
+            float boxWidth = 200;  // fit to box width
+            float boxHeight = 50;  // fit to box height
 
             try (PDPageContentStream contentStream = new PDPageContentStream(document, page,
                     PDPageContentStream.AppendMode.APPEND, true)) {
@@ -59,7 +63,8 @@ public class RandomSignatureInPDF {
             }
 
             document.save(outputFile);
-            System.out.println("✅ Random signature added → " + outputFile.getAbsolutePath());
+            System.out.println("✅ Random name signature added → " + chosenName);
+            System.out.println("Output PDF → " + outputFile.getAbsolutePath());
         }
     }
 }
