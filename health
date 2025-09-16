@@ -1,33 +1,65 @@
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
-import org.apache.pdfbox.pdmodel.interactive.form.PDField;
-import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.List;
 
-public class FindSignatureBox {
+public class RandomSignatureInPDF {
     public static void main(String[] args) throws Exception {
-        try (PDDocument document = PDDocument.load(new File("input.pdf"))) {
-            PDAcroForm acroForm = document.getDocumentCatalog().getAcroForm();
+        File inputFile = new File("input.pdf");
+        File outputFile = new File("signed_output.pdf");
 
-            if (acroForm != null) {
-                PDField sigField = acroForm.getField("Signature1"); // field name in PDF
-                if (sigField != null) {
-                    List<PDAnnotationWidget> widgets = sigField.getWidgets();
-                    if (!widgets.isEmpty()) {
-                        PDRectangle rect = widgets.get(0).getRectangle();
-                        float x = rect.getLowerLeftX();
-                        float y = rect.getLowerLeftY();
-                        float width = rect.getWidth();
-                        float height = rect.getHeight();
+        try (PDDocument document = PDDocument.load(inputFile)) {
+            PDPage page = document.getPage(0); // first page
 
-                        System.out.printf("Signature box coords: x=%f, y=%f, width=%f, height=%f%n",
-                                x, y, width, height);
-                    }
-                }
+            // ---- Step 1: Generate random signature image ----
+            int sigWidth = 200, sigHeight = 50;
+            BufferedImage sigImage = new BufferedImage(sigWidth, sigHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2d = sigImage.createGraphics();
+
+            // transparent background
+            g2d.setComposite(AlphaComposite.Clear);
+            g2d.fillRect(0, 0, sigWidth, sigHeight);
+            g2d.setComposite(AlphaComposite.SrcOver);
+
+            // draw signature strokes
+            g2d.setColor(Color.BLACK);
+            g2d.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            int x = 10, y = sigHeight / 2;
+            for (int i = 0; i < 8; i++) {
+                int dx = (int) (Math.random() * 30 + 20);
+                int dy = (int) (Math.random() * 20 - 10);
+                g2d.drawLine(x, y, x + dx, y + dy);
+                x += dx;
+                y += dy;
+                if (x > sigWidth - 10) break;
             }
+            g2d.dispose();
+
+            // Save temp signature PNG
+            File sigFile = new File("temp_signature.png");
+            ImageIO.write(sigImage, "png", sigFile);
+
+            // ---- Step 2: Load into PDF ----
+            PDImageXObject pdImage = PDImageXObject.createFromFile(sigFile.getAbsolutePath(), document);
+
+            // ---- Enter your box coordinates here ----
+            float xPos = 100;   // left
+            float yPos = 150;   // bottom
+            float boxWidth = 200;
+            float boxHeight = 50;
+
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, page,
+                    PDPageContentStream.AppendMode.APPEND, true)) {
+                contentStream.drawImage(pdImage, xPos, yPos, boxWidth, boxHeight);
+            }
+
+            document.save(outputFile);
+            System.out.println("✅ Random signature added → " + outputFile.getAbsolutePath());
         }
     }
 }
