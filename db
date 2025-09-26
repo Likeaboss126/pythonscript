@@ -1,58 +1,121 @@
-Success Criterion,Level,Axe-core,Selenium,Manual/AI
-1.1.1 Non-text Content,A,Yes,No,No
-1.2.1 Audio-only/Video-only (Prerecorded),A,No,No,Yes
-1.2.2 Captions (Prerecorded),A,No,No,Yes
-1.2.3 Audio Description or Media Alternative (Prerecorded),A,No,No,Yes
-1.2.4 Captions (Live),AA,No,No,Yes
-1.2.5 Audio Description (Prerecorded),AA,No,No,Yes
-1.2.6 Sign Language (Prerecorded),AA,No,No,Yes
-1.3.1 Info and Relationships,A,Yes,No,No
-1.3.2 Meaningful Sequence,A,No,No,Yes
-1.3.3 Sensory Characteristics,A,No,No,Yes
-1.3.4 Orientation,AA,No,Yes,No
-1.3.5 Identify Input Purpose,AA,Yes,No,No
-1.3.6 Identify Purpose,AA,No,No,Yes
-1.4.1 Use of Color,A,Yes,No,No
-1.4.2 Audio Control,A,No,No,Yes
-1.4.3 Contrast (Minimum),AA,Yes,No,No
-1.4.4 Resize Text,AA,No,Yes,No
-1.4.5 Images of Text,AA,Yes,No,No
-1.4.10 Reflow,AA,No,Yes,No
-1.4.11 Non-text Contrast,AA,Yes,No,No
-1.4.12 Text Spacing,AA,No,Yes,No
-1.4.13 Content on Hover or Focus,AA,No,Yes,No
-2.1.1 Keyboard,A,No,Yes,No
-2.1.2 No Keyboard Trap,A,No,Yes,No
-2.1.4 Character Key Shortcuts,A,No,No,Yes
-2.2.1 Timing Adjustable,A,No,No,Yes
-"2.2.2 Pause, Stop, Hide",A,No,No,Yes
-2.2.7 Accessible Authentication,AA,No,No,Yes
-2.3.1 Three Flashes or Below Threshold,A,No,No,Yes
-2.4.1 Bypass Blocks,A,Yes,No,No
-2.4.2 Page Titled,A,Yes,No,No
-2.4.3 Focus Order,A,No,Yes,No
-2.4.4 Link Purpose (In Context),A,No,No,Yes
-2.4.5 Multiple Ways,AA,No,No,Yes
-2.4.6 Headings and Labels,AA,Yes,No,No
-2.4.7 Focus Visible,AA,No,Yes,No
-2.5.1 Pointer Gestures,A,No,No,Yes
-2.5.2 Pointer Cancellation,A,No,Yes,No
-2.5.3 Label in Name,A,Yes,No,No
-2.5.4 Motion Actuation,A,No,No,Yes
-2.5.7 Dragging Movements,AA,No,Yes,No
-2.5.8 Target Size (Minimum),AA,Yes,No,No
-3.1.1 Language of Page,A,Yes,No,No
-3.1.2 Language of Parts,AA,Yes,No,No
-3.2.1 On Focus,A,No,Yes,No
-3.2.2 On Input,A,No,Yes,No
-3.2.3 Consistent Navigation,AA,No,No,Yes
-3.2.4 Consistent Identification,AA,No,No,Yes
-3.3.1 Error Identification,A,Yes,No,No
-3.3.2 Labels or Instructions,A,Yes,No,No
-3.3.3 Error Suggestion,AA,No,No,Yes
-"3.3.4 Error Prevention (Legal, Financial, Data)",AA,No,No,Yes
-3.3.7 Redundant Entry,AA,No,No,Yes
-3.3.8 Accessible Authentication (No Cognitive Test),A,No,No,Yes
-4.1.1 Parsing,A,Yes,No,No
-"4.1.2 Name, Role, Value",A,Yes,No,No
-4.1.3 Status Messages,AA,Partial,Yes,No
+import psycopg2
+import requests
+import json
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+# ---------------------------
+# Database Config
+# ---------------------------
+DB_CONFIG = {
+    "dbname": "your_db",
+    "user": "your_user",
+    "password": "your_password",
+    "host": "localhost",
+    "port": 5432
+}
+
+# ---------------------------
+# Ollama Config
+# ---------------------------
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL = "llama3"   # or whichever Ollama model you use
+
+# ---------------------------
+# Step 1 - Generate SQL
+# ---------------------------
+def generate_sql(user_query: str) -> str:
+    system_prompt = """
+    You are an assistant that generates SQL queries for a Postgres database.
+    The table name is `api_logs` with columns:
+      - functionality (text)
+      - api_name (text)
+      - average_time_taken (float)
+      - passed (int)
+      - failed (int)
+      - date_time (timestamp)
+    Rules:
+      - Always filter correctly by date ranges if mentioned (yesterday, last 7 days, last 2 months, etc).
+      - Use GROUP BY with date_time::date if showing trends.
+      - Return no explanations, only SQL.
+    """
+    payload = {
+        "model": MODEL,
+        "prompt": f"{system_prompt}\nUser question: {user_query}\nSQL:"
+    }
+    response = requests.post(OLLAMA_URL, json=payload)
+    sql_query = response.json()["response"].strip()
+    return sql_query
+
+# ---------------------------
+# Step 2 - Run SQL
+# ---------------------------
+def run_sql(sql: str):
+    conn = psycopg2.connect(**DB_CONFIG)
+    cur = conn.cursor()
+    cur.execute(sql)
+    rows = cur.fetchall()
+    colnames = [desc[0] for desc in cur.description]
+    cur.close()
+    conn.close()
+    return [dict(zip(colnames, row)) for row in rows]
+
+# ---------------------------
+# Step 3 - Summarize Results
+# ---------------------------
+def summarize_results(user_query: str, sql: str, results: list) -> str:
+    system_prompt = "You are an assistant that explains SQL results in plain English for business users."
+    payload = {
+        "model": MODEL,
+        "prompt": f"{system_prompt}\nUser question: {user_query}\nSQL: {sql}\nResults: {json.dumps(results)}\nAnswer:"
+    }
+    response = requests.post(OLLAMA_URL, json=payload)
+    return response.json()["response"].strip()
+
+# ---------------------------
+# Step 4 - Plot Trends (if applicable)
+# ---------------------------
+def plot_trend(results: list, x_col="date", y_col="avg_time", api_name=None):
+    if not results:
+        print("No trend data to plot.")
+        return
+    dates = [r[x_col] for r in results]
+    values = [r[y_col] for r in results]
+
+    # Convert dates if needed
+    try:
+        dates = [datetime.strptime(str(d), "%Y-%m-%d") for d in dates]
+    except:
+        pass
+
+    plt.figure(figsize=(8, 4))
+    plt.plot(dates, values, marker="o")
+    plt.title(f"Trend of {api_name or 'API'} over time")
+    plt.xlabel("Date")
+    plt.ylabel("Average Response Time (s)")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+# ---------------------------
+# Main
+# ---------------------------
+if __name__ == "__main__":
+    # Example: Trend Query
+    user_query = "Show me the trend of API 'LoginAPI' average time over last 2 months"
+
+    print("User:", user_query)
+
+    sql = generate_sql(user_query)
+    print("\nGenerated SQL:\n", sql)
+
+    results = run_sql(sql)
+    print("\nRaw Results:\n", results)
+
+    final_answer = summarize_results(user_query, sql, results)
+    print("\nFinal Answer:\n", final_answer)
+
+    # If results contain multiple dates, plot trend
+    if results and "date" in results[0] and "avg_time" in results[0]:
+        plot_trend(results, x_col="date", y_col="avg_time", api_name="LoginAPI")
