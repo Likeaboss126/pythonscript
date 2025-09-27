@@ -26,6 +26,12 @@ MODEL = "llama3"   # or whichever Ollama model you use
 # ---------------------------
 def generate_sql(user_query: str) -> str:
     system_prompt = """
+You are an expert PostgreSQL assistant. 
+Only generate SQL queries, no explanations.
+Table: api_metrics
+Columns: functionality, api_name, average_time_taken, passed, failed, date_time
+User question: <insert user query here>
+
     You are an assistant that generates SQL queries for a Postgres database.
     The table name is `api_logs` with columns:
       - functionality (text)
