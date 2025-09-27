@@ -1,3 +1,42 @@
+import requests, json
+
+url = "http://localhost:11434/api/chat"
+
+payload = {
+    "model": "llama-3.2.-1-b",
+    "messages": [
+        {
+            "role": "system",
+            "content": """You are an expert PostgreSQL assistant.
+Only generate SQL queries, no explanations.
+Table: api_metrics
+Columns: functionality, api_name, average_time_taken, passed, failed, date_time"""
+        },
+        {
+            "role": "user",
+            "content": "Find the slowest API yesterday and its functionality"
+        }
+    ],
+    "stream": False
+}
+
+r = requests.post(url, json=payload)
+
+# Ollama still may stream multiple JSON lines → collect them
+parts = []
+for line in r.text.splitlines():
+    if line.strip():
+        try:
+            data = json.loads(line)
+            if "message" in data and "content" in data["message"]:
+                parts.append(data["message"]["content"])
+        except json.JSONDecodeError:
+            pass
+
+sql_query = "".join(parts).strip()
+print("\nGenerated SQL:\n", sql_query)
+
+
 import psycopg2
 import requests
 import json
