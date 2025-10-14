@@ -1,126 +1,35 @@
-import streamlit as st
+import cv2
+import pytesseract
 import pandas as pd
-import psycopg2
-import plotly.express as px
 
-# ------------------------ PAGE CONFIG ------------------------
-st.set_page_config(page_title="API Performance Dashboard", layout="wide")
-st.title("📊 API Performance Dashboard (PostgreSQL)")
+# Read image
+img = cv2.imread("table_image.jpg")
 
-# ------------------------ DATABASE CONNECTION ------------------------
-@st.cache_resource
-def get_connection():
-    return psycopg2.connect(
-        dbname="your_dbname",
-        user="your_user",
-        password="your_password",
-        host="your_host",
-        port="5432"  # Change if needed
-    )
+# Optional: convert to grayscale and threshold for clarity
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+gray = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
 
-@st.cache_data
-def load_data():
-    try:
-        conn = get_connection()
-        query = "SELECT * FROM data;"
-        df = pd.read_sql(query, conn)
-        conn.close()
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return pd.DataFrame()
+# OCR with bounding boxes
+data = pytesseract.image_to_data(gray, output_type=pytesseract.Output.DATAFRAME)
 
-df = load_data()
+# Filter out blanks
+data = data[data.text.notnull()]
 
-if df.empty:
-    st.stop()
+# You can group by 'block_num' or use y-coordinate clustering for rows
+rows = []
+current_y = None
+current_row = []
 
-# ------------------------ FILTERS ------------------------
-st.sidebar.header("🔎 Filters")
-all_funcs = df['Functionality'].unique().tolist()
-all_apis = df['API'].unique().tolist()
-
-if 'reset' not in st.session_state:
-    st.session_state.reset = False
-
-if st.sidebar.button("🔄 Reset Filters"):
-    st.session_state.reset = True
-
-if st.session_state.reset:
-    selected_funcs = all_funcs[0:1]
-    selected_apis = df[df['Functionality'].isin(selected_funcs)]['API'].unique().tolist()[0:1]
-    st.session_state.reset = False
-else:
-    selected_funcs = st.sidebar.multiselect("Select Functionality", all_funcs, default=all_funcs[0:1], key="selected_funcs")
-    filtered_apis = df[df['Functionality'].isin(selected_funcs)]['API'].unique().tolist()
-    selected_apis = st.sidebar.multiselect("Select API", filtered_apis, default=filtered_apis[0:1], key="selected_apis")
-
-df_filtered = df[(df['Functionality'].isin(selected_funcs)) & (df['API'].isin(selected_apis))]
-
-# ------------------------ TABS ------------------------
-tabs = st.tabs(["📊 Dashboard", "📈 API Performance Change"])
-
-# ------------------------ MAIN DASHBOARD TAB ------------------------
-with tabs[0]:
-    if not df_filtered.empty:
-        # KPI Summary
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total API Calls", int(df_filtered["Total"].sum()))
-        col2.metric("Success", int(df_filtered["OK"].sum()))
-        col3.metric("Failures", int(df_filtered["KO"].sum()))
-
-        # Bar Chart
-        st.subheader("📊 Average Time Taken by API")
-        fig = px.bar(df_filtered, x="API", y="Averagetimetaken", color="Functionality", 
-                     barmode="group", title="Average Time Taken (ms)")
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Show Table
-        st.subheader("📄 Detailed API Stats")
-        st.dataframe(df_filtered.sort_values(by="API"), use_container_width=True)
+for i, row in data.iterrows():
+    if current_y is None:
+        current_y = row['top']
+    if abs(row['top'] - current_y) < 15:  # same line tolerance
+        current_row.append(row['text'])
     else:
-        st.warning("No data matches the selected filters.")
+        rows.append(current_row)
+        current_row = [row['text']]
+        current_y = row['top']
 
-# ------------------------ PERFORMANCE CHANGE TAB ------------------------
-with tabs[1]:
-    st.subheader("📅 Weekly API Performance Change")
-    if 'Week' not in df.columns:
-        st.warning("Week data not available in the current dataset.")
-    else:
-        df['Week'] = pd.to_datetime(df['Week']) if not pd.api.types.is_datetime64_any_dtype(df['Week']) else df['Week']
-        weeks_available = sorted(df['Week'].unique(), reverse=True)
-
-        if len(weeks_available) < 2:
-            st.warning("Not enough weeks available for comparison.")
-        else:
-            col1, col2 = st.columns(2)
-            week1 = col1.selectbox("Select Week 1", weeks_available, index=1)
-            week2 = col2.selectbox("Select Week 2", weeks_available, index=0)
-
-            df_w1 = df[(df['Week'] == week1) & (df['API'].isin(selected_apis))]
-            df_w2 = df[(df['Week'] == week2) & (df['API'].isin(selected_apis))]
-
-            summary = []
-            for api in selected_apis:
-                w1_data = df_w1[df_w1['API'] == api]
-                w2_data = df_w2[df_w2['API'] == api]
-                if w1_data.empty or w2_data.empty:
-                    continue
-                avg1 = w1_data['Averagetimetaken'].mean()
-                avg2 = w2_data['Averagetimetaken'].mean()
-                change = ((avg2 - avg1) / avg1) * 100
-                direction = "Improved by" if change < -2 else ("Degraded by" if change > 2 else "No significant change")
-                summary.append({
-                    'API': api,
-                    'Week 1': str(week1),
-                    'Week 2': str(week2),
-                    'Avg Week 1': round(avg1, 2),
-                    'Avg Week 2': round(avg2, 2),
-                    'Change': f"{direction} {abs(change):.2f}%" if direction != "No significant change" else direction
-                })
-
-            if summary:
-                df_summary = pd.DataFrame(summary)
-                st.dataframe(df_summary.sort_values("API"), use_container_width=True)
-            else:
-                st.info("No common API data available for both weeks.")
+rows.append(current_row)
+df = pd.DataFrame(rows)
+print(df)
