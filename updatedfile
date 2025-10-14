@@ -1,3 +1,12 @@
+import pytesseract
+from PIL import Image
+
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+text = pytesseract.image_to_string(Image.open("table_image.png"))
+print(text)
+
+
 import cv2
 import pytesseract
 import pandas as pd
