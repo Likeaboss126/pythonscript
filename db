@@ -35,6 +35,7 @@ import com.intuit.karate.core.ScenarioResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 public class KarateExtentReporter {
 
@@ -42,21 +43,25 @@ public class KarateExtentReporter {
         ExtentReports extent = ExtentManager.getInstance();
         ExtentTest parentTest = extent.createTest(testName);
 
-        for (FeatureResult featureResult : results.getFeatureResults()) {
+        // ✅ Convert to list explicitly — works for all Karate versions
+        List<FeatureResult> featureResults = results.getFeatureResults();
+
+        for (FeatureResult featureResult : featureResults) {
             ExtentTest featureNode = parentTest.createNode(featureResult.getFeature().getName());
 
-            for (ScenarioResult scenarioResult : featureResult.getScenarioResults()) {
+            // iterate over scenarios
+            List<ScenarioResult> scenarioResults = featureResult.getScenarioResults();
+            for (ScenarioResult scenarioResult : scenarioResults) {
                 ExtentTest scenarioNode = featureNode.createNode(scenarioResult.getScenario().getName());
 
                 if (scenarioResult.isFailed()) {
                     scenarioNode.fail(scenarioResult.getError());
 
-                    // Log detailed request/response info for failed scenarios
+                    // Log details only for failed scenarios
                     try {
                         String logFilePath = scenarioResult.getScenario().getLogFilePath();
-                        if (logFilePath != null) {
+                        if (logFilePath != null && Files.exists(Paths.get(logFilePath))) {
                             String logContent = new String(Files.readAllBytes(Paths.get(logFilePath)));
-                            // Only include a few KB of logs to avoid giant HTMLs
                             if (logContent.length() > 8000) {
                                 logContent = logContent.substring(0, 8000) + "... [truncated]";
                             }
@@ -74,8 +79,10 @@ public class KarateExtentReporter {
     }
 
     private static String escapeHtml(String text) {
-        return text.replace("&", "&amp;")
-                   .replace("<", "&lt;")
-                   .replace(">", "&gt;");
+        return text == null ? "" : text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }
+
