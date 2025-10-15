@@ -1,6 +1,81 @@
-for d in abc/*/; do
-  [ -d "$d" ] || continue
-  files=$(find "$d" -maxdepth 1 -type f | wc -l)
-  dirs=$(find "$d" -maxdepth 1 -type d | wc -l)
-  echo "Folder: ${d%/} | Files: $files | Folders: $((dirs - 1))"
-done
+package com.example.reports;
+
+import com.aventstack.extentreports.ExtentReports;
+import com.aventstack.extentreports.reporter.ExtentSparkReporter;
+
+public class ExtentManager {
+    private static ExtentReports extent;
+
+    public static synchronized ExtentReports getInstance() {
+        if (extent == null) {
+            ExtentSparkReporter spark = new ExtentSparkReporter("target/extent-reports/ExtentReport.html");
+            extent = new ExtentReports();
+            extent.attachReporter(spark);
+        }
+        return extent;
+    }
+
+    public static synchronized void flush() {
+        if (extent != null) {
+            extent.flush();
+        }
+    }
+}
+
+
+
+package com.example.reports;
+
+import com.aventstack.extentreports.ExtentReports;
+import com.aventstack.extentreports.ExtentTest;
+import com.intuit.karate.Results;
+import com.intuit.karate.core.FeatureResult;
+import com.intuit.karate.core.ScenarioResult;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+public class KarateExtentReporter {
+
+    public static void addKarateResults(String testName, Results results) {
+        ExtentReports extent = ExtentManager.getInstance();
+        ExtentTest parentTest = extent.createTest(testName);
+
+        for (FeatureResult featureResult : results.getFeatureResults()) {
+            ExtentTest featureNode = parentTest.createNode(featureResult.getFeature().getName());
+
+            for (ScenarioResult scenarioResult : featureResult.getScenarioResults()) {
+                ExtentTest scenarioNode = featureNode.createNode(scenarioResult.getScenario().getName());
+
+                if (scenarioResult.isFailed()) {
+                    scenarioNode.fail(scenarioResult.getError());
+
+                    // Log detailed request/response info for failed scenarios
+                    try {
+                        String logFilePath = scenarioResult.getScenario().getLogFilePath();
+                        if (logFilePath != null) {
+                            String logContent = new String(Files.readAllBytes(Paths.get(logFilePath)));
+                            // Only include a few KB of logs to avoid giant HTMLs
+                            if (logContent.length() > 8000) {
+                                logContent = logContent.substring(0, 8000) + "... [truncated]";
+                            }
+                            scenarioNode.info("<pre>" + escapeHtml(logContent) + "</pre>");
+                        }
+                    } catch (IOException e) {
+                        scenarioNode.warning("Failed to read scenario log: " + e.getMessage());
+                    }
+
+                } else {
+                    scenarioNode.pass("Passed");
+                }
+            }
+        }
+    }
+
+    private static String escapeHtml(String text) {
+        return text.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;");
+    }
+}
