@@ -31,10 +31,8 @@ import com.aventstack.extentreports.ExtentTest;
 import com.intuit.karate.Results;
 import com.intuit.karate.core.FeatureResult;
 import com.intuit.karate.core.ScenarioResult;
+import com.intuit.karate.core.StepResult;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.List;
 
 public class KarateExtentReporter {
@@ -43,13 +41,11 @@ public class KarateExtentReporter {
         ExtentReports extent = ExtentManager.getInstance();
         ExtentTest parentTest = extent.createTest(testName);
 
-        // ✅ Convert to list explicitly — works for all Karate versions
         List<FeatureResult> featureResults = results.getFeatureResults();
 
         for (FeatureResult featureResult : featureResults) {
             ExtentTest featureNode = parentTest.createNode(featureResult.getFeature().getName());
 
-            // iterate over scenarios
             List<ScenarioResult> scenarioResults = featureResult.getScenarioResults();
             for (ScenarioResult scenarioResult : scenarioResults) {
                 ExtentTest scenarioNode = featureNode.createNode(scenarioResult.getScenario().getName());
@@ -57,19 +53,27 @@ public class KarateExtentReporter {
                 if (scenarioResult.isFailed()) {
                     scenarioNode.fail(scenarioResult.getError());
 
-                    // Log details only for failed scenarios
-                    try {
-                        String logFilePath = scenarioResult.getScenario().getLogFilePath();
-                        if (logFilePath != null && Files.exists(Paths.get(logFilePath))) {
-                            String logContent = new String(Files.readAllBytes(Paths.get(logFilePath)));
-                            if (logContent.length() > 8000) {
-                                logContent = logContent.substring(0, 8000) + "... [truncated]";
-                            }
-                            scenarioNode.info("<pre>" + escapeHtml(logContent) + "</pre>");
+                    // ✅ Capture only logs from failed scenarios
+                    StringBuilder stepLogs = new StringBuilder();
+
+                    for (StepResult stepResult : scenarioResult.getStepResults()) {
+                        // Step text (Given, When, Then etc.)
+                        String stepText = stepResult.getStep().getText();
+                        stepLogs.append(stepText).append("\n");
+
+                        // Append HTTP request / response info if present
+                        String logText = stepResult.getResult().getLog();
+                        if (logText != null && !logText.isEmpty()) {
+                            stepLogs.append(logText).append("\n");
                         }
-                    } catch (IOException e) {
-                        scenarioNode.warning("Failed to read scenario log: " + e.getMessage());
+                        stepLogs.append("----\n");
                     }
+
+                    String logs = stepLogs.toString();
+                    if (logs.length() > 10000) {
+                        logs = logs.substring(0, 10000) + "... [truncated]";
+                    }
+                    scenarioNode.info("<pre>" + escapeHtml(logs) + "</pre>");
 
                 } else {
                     scenarioNode.pass("Passed");
@@ -85,4 +89,3 @@ public class KarateExtentReporter {
                 .replace(">", "&gt;");
     }
 }
-
