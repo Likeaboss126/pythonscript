@@ -3,7 +3,7 @@ import extract_msg
 df.rename(columns={'old_name': 'new_name'}, inplace=True)
 # 📂 Folder containing your .msg files
 folder_path = r"C:\Users\Mudit\Desktop\Emails"
-
+df.rename(columns={df.columns[-1]: "new_name"}, inplace=True)
 # 📄 Output files
 output_file = os.path.join(folder_path, "all_bodies.txt")
 error_file = os.path.join(folder_path, "failed_files.txt")
