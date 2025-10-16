@@ -1,30 +1,53 @@
 import psycopg2
+import traceback
 
-conn = psycopg2.connect(
-    host="localhost",
-    database="your_db_name",
-    user="username",
-    password="password"
-)
-cur = conn.cursor()
-
+sql_file = r"C:\Users\Mudit\Desktop\inserts.sql"
 failed_log = r"C:\Users\Mudit\Desktop\failed_queries.txt"
-open(failed_log, "w").close()  # clear old log
 
-with open(r"C:\Users\Mudit\Desktop\inserts.sql", "r", encoding="utf-8") as f:
-    queries = [q.strip() for q in f.read().split(";") if q.strip()]
+# Clear previous failed log
+open(failed_log, "w").close()
 
-for i, query in enumerate(queries, 1):
+try:
+    conn = psycopg2.connect(
+        host="localhost",
+        database="your_db_name",
+        user="username",
+        password="password"
+    )
+    cursor = conn.cursor()
+
     try:
-        cur.execute(query)
-        conn.commit()
-        print(f"✅ Query {i} succeeded")
-    except Exception as e:
-        conn.rollback()  # rollback this query
-        print(f"❌ Query {i} failed: {e}")
-        with open(failed_log, "a", encoding="utf-8") as f_err:
-            f_err.write(f"\n--- QUERY #{i} ---\n{query}\nError: {e}\n")
+        with open(sql_file, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception as e_file:
+        print(f"Failed to read SQL file: {e_file}")
+        with open(failed_log, "a") as f_err:
+            f_err.write(f"Failed to read SQL file: {e_file}\n")
+        raise SystemExit(1)
 
-cur.close()
-conn.close()
-print("All queries processed!")
+    queries = [q.strip() for q in content.split(";") if q.strip()]
+
+    for i, query in enumerate(queries, start=1):
+        try:
+            cursor.execute(query)
+            conn.commit()
+            print(f"✅ Query {i} succeeded")
+        except Exception as e:
+            conn.rollback()
+            print(f"❌ Query {i} failed: {e}")
+            with open(failed_log, "a", encoding="utf-8") as f_err:
+                f_err.write(f"\n--- QUERY #{i} ---\n{query}\nError: {e}\n{traceback.format_exc()}\n")
+
+except Exception as e_main:
+    print(f"Fatal error: {e_main}")
+    with open(failed_log, "a") as f_err:
+        f_err.write(f"Fatal error outside loop: {e_main}\n{traceback.format_exc()}\n")
+
+finally:
+    try:
+        cursor.close()
+        conn.close()
+    except:
+        pass
+
+print("All queries processed! Check failed_queries.txt for errors.")
