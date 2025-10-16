@@ -1,53 +1,176 @@
+import streamlit as st
+import pandas as pd
 import psycopg2
-import traceback
+import plotly.express as px
 
-sql_file = r"C:\Users\Mudit\Desktop\inserts.sql"
-failed_log = r"C:\Users\Mudit\Desktop\failed_queries.txt"
+# ------------------------ PAGE CONFIG ------------------------
+st.set_page_config(page_title="API Performance Dashboard", layout="wide")
+st.title("📊 API Performance Dashboard (PostgreSQL)")
 
-# Clear previous failed log
-open(failed_log, "w").close()
-
-try:
-    conn = psycopg2.connect(
-        host="localhost",
-        database="your_db_name",
-        user="username",
-        password="password"
+# ------------------------ DATABASE CONNECTION ------------------------
+@st.cache_resource
+def get_connection():
+    return psycopg2.connect(
+        dbname="your_dbname",
+        user="your_user",
+        password="your_password",
+        host="your_host",
+        port="5432"  # Change if needed
     )
-    cursor = conn.cursor()
 
+# ------------------------ FUNCTION TO LOAD ENVIRONMENT DATA ------------------------
+env_table_map = {
+    "Prod": "data_prod",
+    "QA": "data_qa"
+}
+
+@st.cache_data
+def load_env_data(env):
     try:
-        with open(sql_file, "r", encoding="utf-8") as f:
-            content = f.read()
-    except Exception as e_file:
-        print(f"Failed to read SQL file: {e_file}")
-        with open(failed_log, "a") as f_err:
-            f_err.write(f"Failed to read SQL file: {e_file}\n")
-        raise SystemExit(1)
-
-    queries = [q.strip() for q in content.split(";") if q.strip()]
-
-    for i, query in enumerate(queries, start=1):
-        try:
-            cursor.execute(query)
-            conn.commit()
-            print(f"✅ Query {i} succeeded")
-        except Exception as e:
-            conn.rollback()
-            print(f"❌ Query {i} failed: {e}")
-            with open(failed_log, "a", encoding="utf-8") as f_err:
-                f_err.write(f"\n--- QUERY #{i} ---\n{query}\nError: {e}\n{traceback.format_exc()}\n")
-
-except Exception as e_main:
-    print(f"Fatal error: {e_main}")
-    with open(failed_log, "a") as f_err:
-        f_err.write(f"Fatal error outside loop: {e_main}\n{traceback.format_exc()}\n")
-
-finally:
-    try:
-        cursor.close()
+        conn = get_connection()
+        table_name = env_table_map[env]
+        query = f"SELECT * FROM {table_name};"
+        df_env = pd.read_sql(query, conn)
         conn.close()
-    except:
-        pass
+        return df_env
+    except Exception as e:
+        st.error(f"Error loading {env} data: {e}")
+        return pd.DataFrame()
 
-print("All queries processed! Check failed_queries.txt for errors.")
+# ------------------------ INITIAL ENV DATA LOAD ------------------------
+# Load default environment to populate sidebar filters
+default_env = list(env_table_map.keys())[0]
+df_env = load_env_data(default_env)
+
+if df_env.empty:
+    st.warning("No data available.")
+    st.stop()
+
+# ------------------------ GLOBAL SIDEBAR FILTERS ------------------------
+st.sidebar.header("🔎 Filters")
+all_funcs = df_env['Functionality'].unique().tolist()
+selected_funcs = st.sidebar.multiselect("Select Functionality", all_funcs, default=all_funcs[0:1])
+filtered_apis = df_env[df_env['Functionality'].isin(selected_funcs)]['API'].unique().tolist()
+selected_apis = st.sidebar.multiselect("Select API", filtered_apis, default=filtered_apis[0:1])
+
+# ------------------------ TABS ------------------------
+tabs = st.tabs(["📊 Dashboard", "📈 API Performance Change"])
+
+# ------------------------ MAIN DASHBOARD TAB ------------------------
+with tabs[0]:
+    # Environment selection at top of main tab
+    selected_env = st.selectbox("Select Environment", list(env_table_map.keys()), index=0)
+
+    # Load data for selected environment
+    df_env = load_env_data(selected_env)
+
+    # Apply sidebar filters
+    df_filtered = df_env[(df_env['Functionality'].isin(selected_funcs)) &
+                         (df_env['API'].isin(selected_apis))]
+
+    if not df_filtered.empty:
+        # KPI Summary
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total API Calls", int(df_filtered["Total"].sum()))
+        col2.metric("Success", int(df_filtered["OK"].sum()))
+        col3.metric("Failures", int(df_filtered["KO"].sum()))
+
+        # Bar Chart
+        st.subheader(f"📊 Average Time Taken by API - Environment: {selected_env}")
+        fig = px.bar(
+            df_filtered,
+            x="API",
+            y="Averagetimetaken",
+            color="Functionality",
+            barmode="group",
+            title=f"Average Time Taken (ms) - {selected_env}"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Weekly Trend Indicators
+        st.subheader("📊 Weekly Trend Indicators (Auto Comparison)")
+        if 'Week' in df_filtered.columns:
+            df_filtered['Week'] = pd.to_datetime(df_filtered['Week']) if not pd.api.types.is_datetime64_any_dtype(df_filtered['Week']) else df_filtered['Week']
+            weeks_available = sorted(df_filtered['Week'].unique(), reverse=True)
+            if len(weeks_available) >= 2:
+                trend_summary = []
+                for api in selected_apis:
+                    week_current = weeks_available[0]
+                    week_previous = weeks_available[1]
+                    data_curr = df_filtered[(df_filtered['Week'] == week_current) & (df_filtered['API'] == api)]
+                    data_prev = df_filtered[(df_filtered['Week'] == week_previous) & (df_filtered['API'] == api)]
+                    if data_curr.empty or data_prev.empty:
+                        continue
+                    avg_curr = data_curr['Averagetimetaken'].mean()
+                    avg_prev = data_prev['Averagetimetaken'].mean()
+                    change = ((avg_curr - avg_prev) / avg_prev) * 100
+                    if change < -2:
+                        indicator = ":green[⬆️ Improved by {:.2f}%]".format(abs(change))
+                    elif change > 2:
+                        indicator = ":red[⬇️ Degraded by {:.2f}%]".format(abs(change))
+                    else:
+                        indicator = "No significant change"
+                    trend_summary.append({
+                        'API': api,
+                        'Avg Current Week': round(avg_curr, 2),
+                        'Avg Previous Week': round(avg_prev, 2),
+                        'Change': indicator
+                    })
+                if trend_summary:
+                    trend_df = pd.DataFrame(trend_summary)
+                    st.dataframe(trend_df.sort_values("API"), use_container_width=True)
+                else:
+                    st.info("Not enough data for automatic trend comparison.")
+            else:
+                st.info("Not enough weeks available for trend comparison.")
+        else:
+            st.info("Week data not available in dataset.")
+
+        # Detailed API Table
+        st.subheader("📄 Detailed API Stats")
+        st.dataframe(df_filtered.sort_values(by="API"), use_container_width=True)
+    else:
+        st.warning("No data matches the selected filters.")
+
+# ------------------------ PERFORMANCE CHANGE TAB ------------------------
+with tabs[1]:
+    st.subheader("📅 Weekly API Performance Change")
+    if 'Week' not in df_env.columns:
+        st.warning("Week data not available in the current dataset.")
+    else:
+        df_env['Week'] = pd.to_datetime(df_env['Week']) if not pd.api.types.is_datetime64_any_dtype(df_env['Week']) else df_env['Week']
+        weeks_available = sorted(df_env['Week'].unique(), reverse=True)
+        if len(weeks_available) < 2:
+            st.warning("Not enough weeks available for comparison.")
+        else:
+            col1, col2 = st.columns(2)
+            week1 = col1.selectbox("Select Week 1", weeks_available, index=1)
+            week2 = col2.selectbox("Select Week 2", weeks_available, index=0)
+
+            df_w1 = df_env[(df_env['Week'] == week1) & (df_env['API'].isin(selected_apis))]
+            df_w2 = df_env[(df_env['Week'] == week2) & (df_env['API'].isin(selected_apis))]
+
+            summary = []
+            for api in selected_apis:
+                w1_data = df_w1[df_w1['API'] == api]
+                w2_data = df_w2[df_w2['API'] == api]
+                if w1_data.empty or w2_data.empty:
+                    continue
+                avg1 = w1_data['Averagetimetaken'].mean()
+                avg2 = w2_data['Averagetimetaken'].mean()
+                change = ((avg2 - avg1) / avg1) * 100
+                direction = "Improved by" if change < -2 else ("Degraded by" if change > 2 else "No significant change")
+                summary.append({
+                    'API': api,
+                    'Week 1': str(week1),
+                    'Week 2': str(week2),
+                    'Avg Week 1': round(avg1, 2),
+                    'Avg Week 2': round(avg2, 2),
+                    'Change': f"{direction} {abs(change):.2f}%" if direction != "No significant change" else direction
+                })
+
+            if summary:
+                df_summary = pd.DataFrame(summary)
+                st.dataframe(df_summary.sort_values("API"), use_container_width=True)
+            else:
+                st.info("No common API data available for both weeks.")
