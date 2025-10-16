@@ -1,18 +1,7 @@
-from datetime import datetime
-import random
+df.columns = df.iloc[0]     # Set first row as column names
+df = df[1:]                 # Remove the first row
+df = df.reset_index(drop=True)
 
-date_str = "16-10-2025"  # Input format: dd-mm-yyyy
 
-# Parse date
-dt = datetime.strptime(date_str, "%d-%m-%Y")
-
-# Generate random hour, minute, second
-hour = random.randint(0, 23)
-minute = random.randint(0, 59)
-second = random.randint(0, 59)
-
-# Combine and format
-dt_with_random_time = dt.replace(hour=hour, minute=minute, second=second)
-final_str = dt_with_random_time.strftime("%Y-%m-%d %H:%M:%S")
-
-print(final_str)
+for _, row in df[1:].iterrows():
+    print(row['name'], row['age'])
