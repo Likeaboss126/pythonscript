@@ -1,38 +1,46 @@
-import os
-import extract_msg
-df.rename(columns={'old_name': 'new_name'}, inplace=True)
-# 📂 Folder containing your .msg files
-folder_path = r"C:\Users\Mudit\Desktop\Emails"
-df.rename(columns={df.columns[-1]: "new_name"}, inplace=True)
-# 📄 Output files
-output_file = os.path.join(folder_path, "all_bodies.txt")
-error_file = os.path.join(folder_path, "failed_files.txt")
+import psycopg2
 
-# Clear old files if they exist
-open(output_file, "w").close()
-open(error_file, "w").close()
+# === Database connection details ===
+DB_CONFIG = {
+    'host': 'localhost',
+    'port': '5432',
+    'database': 'your_db_name',
+    'user': 'your_username',
+    'password': 'your_password'
+}
 
-# Loop through all .msg files
-for file_name in os.listdir(folder_path):
-    if file_name.lower().endswith(".msg"):
-        file_path = os.path.join(folder_path, file_name)
-        try:
-            msg = extract_msg.Message(file_path)
-            body = msg.body or "(No body content)"
-            
-            with open(output_file, "a", encoding="utf-8") as f_out:
-                f_out.write("=======================================\n")
-                f_out.write(f"File: {file_name}\n")
-                f_out.write(f"Subject: {msg.subject}\n")
-                f_out.write(f"From: {msg.sender}\n")
-                f_out.write(f"Date: {msg.date}\n\n")
-                f_out.write(body)
-                f_out.write("\n\n")
+# === File paths ===
+sql_file = r"C:\Users\Mudit\Desktop\inserts.sql"
+failed_log = r"C:\Users\Mudit\Desktop\failed_queries.txt"
 
-        except Exception as e:
-            with open(error_file, "a", encoding="utf-8") as f_err:
-                f_err.write(f"{file_name} - {str(e)}\n")
+# === Connect to DB ===
+conn = psycopg2.connect(**DB_CONFIG)
+cursor = conn.cursor()
 
-print("✅ Done! Check:")
-print(f"  • Email bodies → {output_file}")
-print(f"  • Failed files → {error_file}")
+# === Clear old failed log ===
+open(failed_log, "w").close()
+
+# === Read all queries ===
+with open(sql_file, "r", encoding="utf-8") as f:
+    content = f.read()
+
+# Split queries by semicolon
+queries = [q.strip() for q in content.split(";") if q.strip()]
+
+# === Execute one by one ===
+for i, query in enumerate(queries, start=1):
+    try:
+        cursor.execute(query)
+        conn.commit()
+        print(f"✅ Success: Query {i}")
+    except Exception as e:
+        conn.rollback()  # rollback this one, keep others
+        with open(failed_log, "a", encoding="utf-8") as f_err:
+            f_err.write(f"\n--- FAILED QUERY #{i} ---\n{query}\nError: {e}\n")
+        print(f"❌ Failed: Query {i}")
+
+cursor.close()
+conn.close()
+
+print("\n✅ Done!")
+print(f"Failed queries are logged in: {failed_log}")
