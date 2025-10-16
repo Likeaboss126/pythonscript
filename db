@@ -1,7 +1,25 @@
-df.columns = df.iloc[0]     # Set first row as column names
-df = df[1:]                 # Remove the first row
-df = df.reset_index(drop=True)
+import os
+import extract_msg
 
+# 📂 Folder where your .msg files are stored
+folder_path = r"C:\Users\Mudit\Desktop\Emails"
 
-for _, row in df[1:].iterrows():
-    print(row['name'], row['age'])
+# Iterate through all files in the folder
+for file_name in os.listdir(folder_path):
+    if file_name.lower().endswith(".msg"):
+        file_path = os.path.join(folder_path, file_name)
+        try:
+            msg = extract_msg.Message(file_path)
+            msg_subject = msg.subject
+            msg_sender = msg.sender
+            msg_date = msg.date
+            msg_body = msg.body
+
+            print("=======================================")
+            print(f"File: {file_name}")
+            print(f"Subject: {msg_subject}")
+            print(f"From: {msg_sender}")
+            print(f"Date: {msg_date}")
+            print(f"Body:\n{msg_body[:300]}...")  # Print only first 300 chars for brevity
+        except Exception as e:
+            print(f"Error reading {file_name}: {e}")
