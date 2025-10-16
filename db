@@ -1,91 +1,18 @@
-package com.example.reports;
+from datetime import datetime
+import random
 
-import com.aventstack.extentreports.ExtentReports;
-import com.aventstack.extentreports.reporter.ExtentSparkReporter;
+date_str = "16-10-2025"  # Input format: dd-mm-yyyy
 
-public class ExtentManager {
-    private static ExtentReports extent;
+# Parse date
+dt = datetime.strptime(date_str, "%d-%m-%Y")
 
-    public static synchronized ExtentReports getInstance() {
-        if (extent == null) {
-            ExtentSparkReporter spark = new ExtentSparkReporter("target/extent-reports/ExtentReport.html");
-            extent = new ExtentReports();
-            extent.attachReporter(spark);
-        }
-        return extent;
-    }
+# Generate random hour, minute, second
+hour = random.randint(0, 23)
+minute = random.randint(0, 59)
+second = random.randint(0, 59)
 
-    public static synchronized void flush() {
-        if (extent != null) {
-            extent.flush();
-        }
-    }
-}
+# Combine and format
+dt_with_random_time = dt.replace(hour=hour, minute=minute, second=second)
+final_str = dt_with_random_time.strftime("%Y-%m-%d %H:%M:%S")
 
-
-
-package com.example.reports;
-
-import com.aventstack.extentreports.ExtentReports;
-import com.aventstack.extentreports.ExtentTest;
-import com.intuit.karate.Results;
-import com.intuit.karate.core.FeatureResult;
-import com.intuit.karate.core.ScenarioResult;
-import com.intuit.karate.core.StepResult;
-
-import java.util.List;
-
-public class KarateExtentReporter {
-
-    public static void addKarateResults(String testName, Results results) {
-        ExtentReports extent = ExtentManager.getInstance();
-        ExtentTest parentTest = extent.createTest(testName);
-
-        List<FeatureResult> featureResults = results.getFeatureResults();
-
-        for (FeatureResult featureResult : featureResults) {
-            ExtentTest featureNode = parentTest.createNode(featureResult.getFeature().getName());
-
-            List<ScenarioResult> scenarioResults = featureResult.getScenarioResults();
-            for (ScenarioResult scenarioResult : scenarioResults) {
-                ExtentTest scenarioNode = featureNode.createNode(scenarioResult.getScenario().getName());
-
-                if (scenarioResult.isFailed()) {
-                    scenarioNode.fail(scenarioResult.getError());
-
-                    // ✅ Capture only logs from failed scenarios
-                    StringBuilder stepLogs = new StringBuilder();
-
-                    for (StepResult stepResult : scenarioResult.getStepResults()) {
-                        // Step text (Given, When, Then etc.)
-                        String stepText = stepResult.getStep().getText();
-                        stepLogs.append(stepText).append("\n");
-
-                        // Append HTTP request / response info if present
-                        String logText = stepResult.getResult().getLog();
-                        if (logText != null && !logText.isEmpty()) {
-                            stepLogs.append(logText).append("\n");
-                        }
-                        stepLogs.append("----\n");
-                    }
-
-                    String logs = stepLogs.toString();
-                    if (logs.length() > 10000) {
-                        logs = logs.substring(0, 10000) + "... [truncated]";
-                    }
-                    scenarioNode.info("<pre>" + escapeHtml(logs) + "</pre>");
-
-                } else {
-                    scenarioNode.pass("Passed");
-                }
-            }
-        }
-    }
-
-    private static String escapeHtml(String text) {
-        return text == null ? "" : text
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
-    }
-}
+print(final_str)
