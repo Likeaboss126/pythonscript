@@ -1,46 +1,30 @@
 import psycopg2
 
-# === Database connection details ===
-DB_CONFIG = {
-    'host': 'localhost',
-    'port': '5432',
-    'database': 'your_db_name',
-    'user': 'your_username',
-    'password': 'your_password'
-}
+conn = psycopg2.connect(
+    host="localhost",
+    database="your_db_name",
+    user="username",
+    password="password"
+)
+cur = conn.cursor()
 
-# === File paths ===
-sql_file = r"C:\Users\Mudit\Desktop\inserts.sql"
 failed_log = r"C:\Users\Mudit\Desktop\failed_queries.txt"
+open(failed_log, "w").close()  # clear old log
 
-# === Connect to DB ===
-conn = psycopg2.connect(**DB_CONFIG)
-cursor = conn.cursor()
+with open(r"C:\Users\Mudit\Desktop\inserts.sql", "r", encoding="utf-8") as f:
+    queries = [q.strip() for q in f.read().split(";") if q.strip()]
 
-# === Clear old failed log ===
-open(failed_log, "w").close()
-
-# === Read all queries ===
-with open(sql_file, "r", encoding="utf-8") as f:
-    content = f.read()
-
-# Split queries by semicolon
-queries = [q.strip() for q in content.split(";") if q.strip()]
-
-# === Execute one by one ===
-for i, query in enumerate(queries, start=1):
+for i, query in enumerate(queries, 1):
     try:
-        cursor.execute(query)
+        cur.execute(query)
         conn.commit()
-        print(f"✅ Success: Query {i}")
+        print(f"✅ Query {i} succeeded")
     except Exception as e:
-        conn.rollback()  # rollback this one, keep others
+        conn.rollback()  # rollback this query
+        print(f"❌ Query {i} failed: {e}")
         with open(failed_log, "a", encoding="utf-8") as f_err:
-            f_err.write(f"\n--- FAILED QUERY #{i} ---\n{query}\nError: {e}\n")
-        print(f"❌ Failed: Query {i}")
+            f_err.write(f"\n--- QUERY #{i} ---\n{query}\nError: {e}\n")
 
-cursor.close()
+cur.close()
 conn.close()
-
-print("\n✅ Done!")
-print(f"Failed queries are logged in: {failed_log}")
+print("All queries processed!")
