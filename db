@@ -1,25 +1,38 @@
 import os
 import extract_msg
 
-# 📂 Folder where your .msg files are stored
+# 📂 Folder containing your .msg files
 folder_path = r"C:\Users\Mudit\Desktop\Emails"
 
-# Iterate through all files in the folder
+# 📄 Output files
+output_file = os.path.join(folder_path, "all_bodies.txt")
+error_file = os.path.join(folder_path, "failed_files.txt")
+
+# Clear old files if they exist
+open(output_file, "w").close()
+open(error_file, "w").close()
+
+# Loop through all .msg files
 for file_name in os.listdir(folder_path):
     if file_name.lower().endswith(".msg"):
         file_path = os.path.join(folder_path, file_name)
         try:
             msg = extract_msg.Message(file_path)
-            msg_subject = msg.subject
-            msg_sender = msg.sender
-            msg_date = msg.date
-            msg_body = msg.body
+            body = msg.body or "(No body content)"
+            
+            with open(output_file, "a", encoding="utf-8") as f_out:
+                f_out.write("=======================================\n")
+                f_out.write(f"File: {file_name}\n")
+                f_out.write(f"Subject: {msg.subject}\n")
+                f_out.write(f"From: {msg.sender}\n")
+                f_out.write(f"Date: {msg.date}\n\n")
+                f_out.write(body)
+                f_out.write("\n\n")
 
-            print("=======================================")
-            print(f"File: {file_name}")
-            print(f"Subject: {msg_subject}")
-            print(f"From: {msg_sender}")
-            print(f"Date: {msg_date}")
-            print(f"Body:\n{msg_body[:300]}...")  # Print only first 300 chars for brevity
         except Exception as e:
-            print(f"Error reading {file_name}: {e}")
+            with open(error_file, "a", encoding="utf-8") as f_err:
+                f_err.write(f"{file_name} - {str(e)}\n")
+
+print("✅ Done! Check:")
+print(f"  • Email bodies → {output_file}")
+print(f"  • Failed files → {error_file}")
