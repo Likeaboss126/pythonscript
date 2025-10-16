@@ -1,6 +1,6 @@
 import os
 import extract_msg
-
+df.rename(columns={'old_name': 'new_name'}, inplace=True)
 # 📂 Folder containing your .msg files
 folder_path = r"C:\Users\Mudit\Desktop\Emails"
 
