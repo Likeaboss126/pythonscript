@@ -1,46 +1,92 @@
+import streamlit as st
+import pandas as pd
+import psycopg2
 import ollama
 import json
-import streamlit as st
-for key, value in context_data.items():
-    print(key, type(value))
-st.subheader("💬 AI Assistant: Ask About Performance Trends")
 
-# Prepare context data (limit rows to avoid overloading)
-context_data = df_filtered.head(100).to_dict(orient='records')
+# ---------------- Database ----------------
+def get_connection():
+    return psycopg2.connect(
+        dbname="your_db",
+        user="your_user",
+        password="your_pass",
+        host="your_host",
+        port="5432"
+    )
 
-user_question = st.text_input("Ask a question about your API performance:")
+@st.cache_data
+def load_data():
+    conn = get_connection()
+    query = """
+        SELECT Functionality, API, Averagetimetaken, Total, OK, KO, DateTime
+        FROM data
+        WHERE DateTime >= NOW() - INTERVAL '14 days';
+    """
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
 
-if st.button("Ask AI") and user_question:
-    with st.spinner("Analyzing data..."):
-        # Prepare prompt for Ollama
-        prompt = f"""
-        You are an API performance analyst.
-        Analyze this dataset (in JSON) and answer questions about trends, failures, and performance.
-        Data:
-        {json.dumps(context_data, indent=2)}
+df = load_data()
+df["DateTime"] = pd.to_datetime(df["DateTime"])
+df["Week"] = df["DateTime"].dt.isocalendar().week
 
-        Question: {user_question}
-        Provide your answer clearly in plain English, highlighting insights.
-        """
+# ---------------- Aggregation ----------------
+agg_df = (
+    df.groupby(["Functionality", "API", "Week"], as_index=False)
+      .agg({
+          "Averagetimetaken": "mean",
+          "Total": "sum",
+          "OK": "sum",
+          "KO": "sum"
+      })
+)
 
-        try:
-            response = ollama.chat(model="llama3", messages=[{"role": "user", "content": prompt}])
-            st.markdown(f"**AI Insight:** {response['message']['content']}")
-        except Exception as e:
-            st.error(f"Error connecting to Ollama: {e}")
+latest_week = agg_df["Week"].max()
+previous_week = latest_week - 1
 
-df_filtered["DateTime"] = df_filtered["DateTime"].astype(str)
-import json
+curr = agg_df[agg_df["Week"] == latest_week]
+prev = agg_df[agg_df["Week"] == previous_week]
 
-# If context_data is a dict that contains a DataFrame:
-if isinstance(context_data, dict):
-    for key, value in context_data.items():
-        if isinstance(value, pd.DataFrame):
-            context_data[key] = value.to_dict(orient='records')
+comparison = curr.merge(prev, on=["Functionality", "API"], suffixes=("_curr", "_prev"))
 
-# Or if it's directly a DataFrame:
-if isinstance(context_data, pd.DataFrame):
-    context_data = context_data.to_dict(orient='records')
+comparison["Change%"] = (
+    (comparison["Averagetimetaken_curr"] - comparison["Averagetimetaken_prev"])
+    / comparison["Averagetimetaken_prev"]
+) * 100
 
-# Now this will work:
-json_str = json.dumps(context_data, indent=2)
+significant = comparison[
+    comparison["Change%"].abs() >= 2
+].copy()
+
+# ---------------- AI Summary ----------------
+context_data = significant.to_dict(orient="records")
+context_json = json.dumps(context_data, default=str)
+
+prompt = f"""
+You are an API performance analyst. Compare API performance changes week over week.
+Identify APIs that improved or degraded by ≥2% and summarize by functionality.
+Here is the data:
+{context_json}
+"""
+
+ai_response = ollama.generate(model="llama3", prompt=prompt)
+summary_text = ai_response["response"]
+
+st.subheader("🧠 AI Weekly Insights")
+st.write(summary_text)
+
+# ---------------- Interactive Q&A ----------------
+st.subheader("💬 Ask AI a Question About Performance")
+user_query = st.text_input("Enter your question:")
+
+if st.button("Ask"):
+    qa_prompt = f"""
+    You are analyzing API performance data. Use the context below to answer the question.
+    Context:
+    {context_json}
+
+    Question:
+    {user_query}
+    """
+    answer = ollama.generate(model="llama3", prompt=qa_prompt)
+    st.write(answer["response"])
