@@ -1,7 +1,8 @@
 import ollama
 import json
 import streamlit as st
-
+for key, value in context_data.items():
+    print(key, type(value))
 st.subheader("💬 AI Assistant: Ask About Performance Trends")
 
 # Prepare context data (limit rows to avoid overloading)
