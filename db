@@ -27,3 +27,19 @@ if st.button("Ask AI") and user_question:
             st.markdown(f"**AI Insight:** {response['message']['content']}")
         except Exception as e:
             st.error(f"Error connecting to Ollama: {e}")
+
+
+import json
+
+# If context_data is a dict that contains a DataFrame:
+if isinstance(context_data, dict):
+    for key, value in context_data.items():
+        if isinstance(value, pd.DataFrame):
+            context_data[key] = value.to_dict(orient='records')
+
+# Or if it's directly a DataFrame:
+if isinstance(context_data, pd.DataFrame):
+    context_data = context_data.to_dict(orient='records')
+
+# Now this will work:
+json_str = json.dumps(context_data, indent=2)
