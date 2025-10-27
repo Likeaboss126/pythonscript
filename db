@@ -28,7 +28,7 @@ if st.button("Ask AI") and user_question:
         except Exception as e:
             st.error(f"Error connecting to Ollama: {e}")
 
-
+df_filtered["DateTime"] = df_filtered["DateTime"].astype(str)
 import json
 
 # If context_data is a dict that contains a DataFrame:
