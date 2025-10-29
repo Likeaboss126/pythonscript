@@ -1,10 +1,44 @@
-fetch("https://<controller-domain>/controller/rest/applications?output=JSON", {
-  headers: { "Authorization": "Bearer <your-access-token>" }
-})
-.then(res => res.text())
-.then(console.log)
-.catch(console.error);
+import requests
 
+# === CONFIGURE THESE ===
+controller = "https://company.saas.appdynamics.com"   # 👈 replace with your controller domain
+token = "eyJ0eXAiOiJKV1QiLCJhbGciOi..."                # 👈 paste your token here
 
-curl -X GET "https://<controller-domain>/controller/rest/applications?output=JSON" ^
-     -H "Authorization: Bearer <your-access-token>"
+# === API ENDPOINT ===
+url = f"{controller}/controller/rest/applications?output=JSON"
+
+headers = {
+    "Authorization": f"Bearer {token}"
+}
+
+try:
+    print(f"🔍 Testing connection to: {url}")
+    response = requests.get(url, headers=headers, timeout=30)
+    
+    if response.status_code == 200:
+        print("✅ Token is valid!")
+        print("Response:")
+        print(response.text)
+    elif response.status_code == 401:
+        print("❌ Unauthorized — token might be expired or incorrect.")
+    elif response.status_code == 403:
+        print("🚫 Forbidden — your token lacks permission for this endpoint.")
+    else:
+        print(f"⚠️ Unexpected status code: {response.status_code}")
+        print(response.text)
+
+except requests.exceptions.SSLError as ssl_err:
+    print("❌ SSL/TLS handshake failed. This usually means:")
+    print("   - Your network blocks HTTPS traffic or uses SSL inspection.")
+    print("   - The controller certificate is untrusted.")
+    print(f"   Details: {ssl_err}")
+
+except requests.exceptions.ConnectionError as conn_err:
+    print("❌ Connection failed. Check controller URL or network access.")
+    print(f"   Details: {conn_err}")
+
+except requests.exceptions.Timeout:
+    print("⏱️ Request timed out — network or proxy might be blocking it.")
+
+except Exception as e:
+    print(f"❌ Unexpected error: {e}")
