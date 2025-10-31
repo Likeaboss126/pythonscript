@@ -1,92 +1,38 @@
-import streamlit as st
-import pandas as pd
-import psycopg2
-import ollama
-import json
+pip install chromadb sentence-transformers psycopg2-binary pandas
 
-# ---------------- Database ----------------
-def get_connection():
-    return psycopg2.connect(
-        dbname="your_db",
-        user="your_user",
-        password="your_pass",
-        host="your_host",
-        port="5432"
+print(f"✅ Loaded {len(df)} rows from database.")
+
+# ---------- 3️⃣ Initialize Chroma and Embedding Model ----------
+client = chromadb.PersistentClient(path="./chroma_store")
+collection = client.get_or_create_collection("api_perf")
+
+embedder = SentenceTransformer("mixedbread-ai/mxbai-embed-large")
+
+# ---------- 4️⃣ Prepare Documents ----------
+docs = []
+ids = []
+
+for idx, row in df.iterrows():
+    doc = (
+        f"Functionality: {row['Functionality']}\n"
+        f"DateTime: {row['DateTime']}\n"
+        f"API: {row['API']}\n"
+        f"Total Requests: {row['Total']}\n"
+        f"Passed: {row['Passed']}\n"
+        f"Failed: {row['Failed']}\n"
+        f"Average Time Taken: {row['AverageTimeTaken']}"
     )
+    docs.append(doc)
+    ids.append(str(idx))
 
-@st.cache_data
-def load_data():
-    conn = get_connection()
-    query = """
-        SELECT Functionality, API, Averagetimetaken, Total, OK, KO, DateTime
-        FROM data
-        WHERE DateTime >= NOW() - INTERVAL '14 days';
-    """
-    df = pd.read_sql(query, conn)
-    conn.close()
-    return df
+# ---------- 5️⃣ Embed and Store ----------
+print("🧠 Generating embeddings... (this can take time for large data)")
 
-df = load_data()
-df["DateTime"] = pd.to_datetime(df["DateTime"])
-df["Week"] = df["DateTime"].dt.isocalendar().week
+batch_size = 128
+for i in tqdm(range(0, len(docs), batch_size)):
+    batch_docs = docs[i:i + batch_size]
+    batch_ids = ids[i:i + batch_size]
+    embeddings = embedder.encode(batch_docs, batch_size=32)
+    collection.add(ids=batch_ids, documents=batch_docs, embeddings=embeddings)
 
-# ---------------- Aggregation ----------------
-agg_df = (
-    df.groupby(["Functionality", "API", "Week"], as_index=False)
-      .agg({
-          "Averagetimetaken": "mean",
-          "Total": "sum",
-          "OK": "sum",
-          "KO": "sum"
-      })
-)
-
-latest_week = agg_df["Week"].max()
-previous_week = latest_week - 1
-
-curr = agg_df[agg_df["Week"] == latest_week]
-prev = agg_df[agg_df["Week"] == previous_week]
-
-comparison = curr.merge(prev, on=["Functionality", "API"], suffixes=("_curr", "_prev"))
-
-comparison["Change%"] = (
-    (comparison["Averagetimetaken_curr"] - comparison["Averagetimetaken_prev"])
-    / comparison["Averagetimetaken_prev"]
-) * 100
-
-significant = comparison[
-    comparison["Change%"].abs() >= 2
-].copy()
-
-# ---------------- AI Summary ----------------
-context_data = significant.to_dict(orient="records")
-context_json = json.dumps(context_data, default=str)
-
-prompt = f"""
-You are an API performance analyst. Compare API performance changes week over week.
-Identify APIs that improved or degraded by ≥2% and summarize by functionality.
-Here is the data:
-{context_json}
-"""
-
-ai_response = ollama.generate(model="llama3", prompt=prompt)
-summary_text = ai_response["response"]
-
-st.subheader("🧠 AI Weekly Insights")
-st.write(summary_text)
-
-# ---------------- Interactive Q&A ----------------
-st.subheader("💬 Ask AI a Question About Performance")
-user_query = st.text_input("Enter your question:")
-
-if st.button("Ask"):
-    qa_prompt = f"""
-    You are analyzing API performance data. Use the context below to answer the question.
-    Context:
-    {context_json}
-
-    Question:
-    {user_query}
-    """
-    answer = ollama.generate(model="llama3", prompt=qa_prompt)
-    st.write(answer["response"])
+print(f"✅ Vector DB initialized with {len(docs)} records.")
