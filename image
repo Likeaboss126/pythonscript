@@ -1,26 +1,81 @@
-import cv2
-import pytesseract
-import pandas as pd
-from PIL import Image
+import chromadb
+from chromadb.config import Settings
+from sentence_transformers import SentenceTransformer
+import requests
+import json
 
-# Optional: specify tesseract path
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# -----------------------------
+# 1️⃣  Load local ChromaDB collection
+# -----------------------------
+chroma_client = chromadb.Client(Settings(persist_directory="./chroma_storage"))
+collection = chroma_client.get_collection(name="api_performance_data")
 
-# Load image
-image = cv2.imread('table_image.jpg')
+# -----------------------------
+# 2️⃣  Load local embedding model
+# -----------------------------
+model_path = "models/mxbai-embed-large"
+model = SentenceTransformer(model_path)
 
-# Pre-process image
-gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+# -----------------------------
+# 3️⃣  Define helper function to query
+# -----------------------------
+def query_vector_db(question: str, top_k: int = 5):
+    # Create embedding for the user query
+    query_embedding = model.encode([question], convert_to_numpy=True).tolist()
 
-# OCR on image
-custom_config = r'--oem 3 --psm 6'  # Assume a block of text
-text = pytesseract.image_to_string(thresh, config=custom_config)
+    # Search similar entries in vector DB
+    results = collection.query(
+        query_embeddings=query_embedding,
+        n_results=top_k
+    )
 
-# Split and parse text
-lines = text.split('\n')
-data = [line.split() for line in lines if line.strip()]
+    # Flatten context results
+    documents = results["documents"][0]
+    context = "\n".join(documents)
 
-# Convert to DataFrame (tweak for actual layout)
-df = pd.DataFrame(data)
-print(df)
+    print(f"\n🔍 Top {top_k} relevant records found for query:\n➡️ {question}\n")
+    for i, doc in enumerate(documents, start=1):
+        print(f"{i}. {doc}\n")
+
+    return context
+
+
+# -----------------------------
+# 4️⃣  Optionally, summarize using local Ollama (LLaMA)
+# -----------------------------
+def ask_ollama(context: str, question: str):
+    payload = {
+        "model": "llama3",
+        "prompt": f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer concisely based on the data:",
+        "stream": False
+    }
+
+    try:
+        response = requests.post("http://localhost:11434/api/generate", json=payload)
+        data = response.json()
+        print("\n🧠 AI Answer:\n")
+        print(data.get("response", "No answer generated."))
+    except Exception as e:
+        print(f"⚠️ Error calling Ollama: {e}")
+
+
+# -----------------------------
+# 5️⃣  Run query interactively
+# -----------------------------
+if __name__ == "__main__":
+    print("💡 Example questions you can ask:")
+    print(" - Which API failed the most this week?")
+    print(" - Which functionality has the slowest average response time?")
+    print(" - List APIs with more than 5 failures.")
+    print()
+
+    question = input("Enter your question: ").strip()
+    if not question:
+        print("❌ No question entered. Exiting.")
+        exit()
+
+    # Get context from ChromaDB
+    context_data = query_vector_db(question, top_k=5)
+
+    # Optionally send to LLaMA for summary
+    ask_ollama(context_data, question)
