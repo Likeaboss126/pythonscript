@@ -105,3 +105,28 @@ db = Chroma.from_documents(
 db.persist()
 
 print("✅ Done. Check folder:", persist_directory)
+
+
+
+from sentence_transformers import SentenceTransformer
+import chromadb
+from chromadb.config import Settings
+
+MODEL_PATH = r"C:\path\to\models\mxbai-embed-large"   # change to your local folder
+PERSIST_DIR = r"C:\Users\Mudit\chroma_store"           # change to absolute path you want
+
+# load model from local folder (no internet)
+embedder = SentenceTransformer(MODEL_PATH)
+
+client = chromadb.Client(Settings(persist_directory=PERSIST_DIR))
+collection = client.get_or_create_collection("api_performance_data")
+
+# Example docs
+docs = ["API /login failed 5 times", "API /orders average 200ms"]
+ids = ["d1", "d2"]
+
+# Build embeddings locally then store
+embeddings = embedder.encode(docs, convert_to_numpy=True).tolist()
+collection.add(ids=ids, documents=docs, embeddings=embeddings)
+client.persist()
+print("Persisted to", PERSIST_DIR)
