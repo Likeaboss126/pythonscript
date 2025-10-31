@@ -79,3 +79,7 @@ if __name__ == "__main__":
 
     # Optionally send to LLaMA for summary
     ask_ollama(context_data, question)
+
+
+chroma_client = chromadb.Client(Settings(persist_directory="./chroma_storage"))
+print("Available collections:", chroma_client.list_collections())
