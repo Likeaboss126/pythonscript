@@ -130,3 +130,13 @@ embeddings = embedder.encode(docs, convert_to_numpy=True).tolist()
 collection.add(ids=ids, documents=docs, embeddings=embeddings)
 client.persist()
 print("Persisted to", PERSIST_DIR)
+
+
+import chromadb
+
+client = chromadb.PersistentClient(path="./chroma_storage")
+collection = client.get_collection("api_performance_data")
+
+print("Loaded collection:", collection.name)
+print("Vector count:", collection.count())
+
