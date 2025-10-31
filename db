@@ -36,3 +36,51 @@ for i in tqdm(range(0, len(docs), batch_size)):
     collection.add(ids=batch_ids, documents=batch_docs, embeddings=embeddings)
 
 print(f"✅ Vector DB initialized with {len(docs)} records.")
+
+
+
+
+model_path = "models/mxbai-embed-large"
+model = SentenceTransformer(model_path)
+
+# -----------------------------
+# 3️⃣  Initialize local ChromaDB
+# -----------------------------
+chroma_client = chromadb.Client(Settings(persist_directory="./chroma_storage"))
+collection = chroma_client.get_or_create_collection(name="api_performance_data")
+
+# -----------------------------
+# 4️⃣  Prepare text data for embedding
+# -----------------------------
+texts = []
+ids = []
+
+for idx, row in tqdm(df.iterrows(), total=len(df)):
+    text = (
+        f"Functionality: {row['Functionality']}, "
+        f"API: {row['API']}, "
+        f"AverageTimeTaken: {row['AverageTimeTaken']} ms, "
+        f"Total: {row['Total']}, OK: {row['OK']}, KO: {row['KO']}, "
+        f"DateTime: {row['DateTime']}"
+    )
+    texts.append(text)
+    ids.append(str(idx))
+
+# -----------------------------
+# 5️⃣  Generate embeddings and store in Chroma
+# -----------------------------
+BATCH_SIZE = 50
+
+for i in tqdm(range(0, len(texts), BATCH_SIZE), desc="Embedding batches"):
+    batch_texts = texts[i:i + BATCH_SIZE]
+    batch_ids = ids[i:i + BATCH_SIZE]
+
+    embeddings = model.encode(batch_texts, convert_to_numpy=True).tolist()
+
+    collection.add(
+        ids=batch_ids,
+        documents=batch_texts,
+        embeddings=embeddings
+    )
+
+print(f"✅ Successfully initialized vector database with {len(texts)} records.")
