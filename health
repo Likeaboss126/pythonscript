@@ -1,70 +1,47 @@
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+# init_vector_db.py
+import pandas as pd
+import psycopg2
+from langchain_community.embeddings import OllamaEmbeddings
+from langchain_community.document_loaders import DataFrameLoader
+from langchain_community.vectorstores import Chroma
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.util.Random;
+# --- 1. Connect to PostgreSQL ---
+conn = psycopg2.connect(
+    dbname="your_dbname",
+    user="your_user",
+    password="your_password",
+    host="your_host",
+    port="5432"
+)
 
-public class RandomNameSignature {
-    public static void main(String[] args) throws Exception {
-        File inputFile = new File("input.pdf");
-        File outputFile = new File("signed_output.pdf");
+query = """
+SELECT Functionality, DateTime, API, Total, Passed, Failed, AverageTimeTaken
+FROM data;
+"""
+df = pd.read_sql(query, conn)
+conn.close()
 
-        try (PDDocument document = PDDocument.load(inputFile)) {
-            PDPage page = document.getPage(0); // first page
+# --- 2. Convert each record into text for embedding ---
+df["text"] = df.apply(
+    lambda r: (
+        f"On {r.DateTime}, Functionality '{r.Functionality}' had API '{r.API}' "
+        f"with {r.Total} total calls, {r.Passed} passed, {r.Failed} failed, "
+        f"and an average response time of {r.AverageTimeTaken} ms."
+    ),
+    axis=1
+)
 
-            // ---- Step 1: Pick a random name ----
-            String[] names = {"A. Sharma", "M. Gupta", "R. Verma", "S. Mehta", "K. Patel", "D. Singh"};
-            Random rand = new Random();
-            String chosenName = names[rand.nextInt(names.length)];
+# --- 3. Load DataFrame into LangChain Documents ---
+loader = DataFrameLoader(df, page_content_column="text")
+docs = loader.load()
 
-            // ---- Step 2: Generate signature image ----
-            int sigWidth = 300, sigHeight = 100;
-            BufferedImage sigImage = new BufferedImage(sigWidth, sigHeight, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = sigImage.createGraphics();
+# --- 4. Create embeddings and save to Chroma (persistent) ---
+embeddings = OllamaEmbeddings(model="nomic-embed-text")
 
-            // transparent background
-            g2d.setComposite(AlphaComposite.Clear);
-            g2d.fillRect(0, 0, sigWidth, sigHeight);
-            g2d.setComposite(AlphaComposite.SrcOver);
-
-            // pick a font (script-like if available on system)
-            Font font = new Font("Brush Script MT", Font.ITALIC, 48);
-            if (font == null) {
-                font = new Font("Serif", Font.ITALIC, 48); // fallback
-            }
-
-            g2d.setFont(font);
-            g2d.setColor(Color.BLACK);
-            g2d.drawString(chosenName, 20, sigHeight / 2 + 15);
-
-            g2d.dispose();
-
-            // Save temporary signature file
-            File sigFile = new File("temp_signature.png");
-            ImageIO.write(sigImage, "png", sigFile);
-
-            // ---- Step 3: Load into PDF ----
-            PDImageXObject pdImage = PDImageXObject.createFromFile(sigFile.getAbsolutePath(), document);
-
-            // ---- Step 4: Place inside your box ----
-            float xPos = 100;   // left
-            float yPos = 150;   // bottom
-            float boxWidth = 200;  // fit to box width
-            float boxHeight = 50;  // fit to box height
-
-            try (PDPageContentStream contentStream = new PDPageContentStream(document, page,
-                    PDPageContentStream.AppendMode.APPEND, true)) {
-                contentStream.drawImage(pdImage, xPos, yPos, boxWidth, boxHeight);
-            }
-
-            document.save(outputFile);
-            System.out.println("✅ Random name signature added → " + chosenName);
-            System.out.println("Output PDF → " + outputFile.getAbsolutePath());
-        }
-    }
-}
+vectorstore = Chroma.from_documents(
+    documents=docs,
+    embedding=embeddings,
+    persist_directory="./api_perf_chroma"
+)
+vectorstore.persist()
+print("✅ Vector DB created and stored at ./api_perf_chroma")
