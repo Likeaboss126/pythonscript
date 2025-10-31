@@ -83,3 +83,25 @@ if __name__ == "__main__":
 
 chroma_client = chromadb.Client(Settings(persist_directory="./chroma_storage"))
 print("Available collections:", chroma_client.list_collections())
+
+
+from langchain_chroma import Chroma
+from langchain_community.embeddings import OllamaEmbeddings
+from langchain.docstore.document import Document
+import os
+
+persist_directory = r"C:\Users\Mudit\Documents\chroma_storage1"
+os.makedirs(persist_directory, exist_ok=True)
+
+embedding_model = OllamaEmbeddings(model="mxbai-embed-large")
+
+docs = [Document(page_content="Hello world", metadata={"id": 1})]
+
+db = Chroma.from_documents(
+    documents=docs,
+    embedding=embedding_model,
+    persist_directory=persist_directory
+)
+db.persist()
+
+print("✅ Done. Check folder:", persist_directory)
