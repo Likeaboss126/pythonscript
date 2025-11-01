@@ -256,3 +256,90 @@ print("🔍 Top results:")
 for doc in results["documents"][0]:
     print("-", doc)
 
+import pandas as pd
+import datetime
+from chromadb import PersistentClient
+from chromadb.utils import embedding_functions
+import psycopg2
+
+# ------------------------ CONFIG ------------------------
+PERSIST_DIR = r"C:\path\to\chroma_storage"  # ✅ Change to your folder
+DB_CONFIG = {
+    "dbname": "your_dbname",
+    "user": "your_user",
+    "password": "your_password",
+    "host": "your_host",
+    "port": 5432
+}
+EMBED_MODEL = "mxbai-embed-large"  # Your local embedding model
+OLLAMA_URL = "http://localhost:11434"  # Ollama local endpoint
+
+# ------------------------ DB CONNECTION ------------------------
+def get_data_from_db():
+    conn = psycopg2.connect(**DB_CONFIG)
+    query = """
+        SELECT Functionality, API, "DateTime", Total, OK, KO, "AverageTimeTaken"
+        FROM data;
+    """
+    df = pd.read_sql(query, conn)
+    conn.close()
+    return df
+
+# ------------------------ ENRICH DATETIME ------------------------
+def enrich_datetime_text(dt):
+    """Convert precise datetime into readable text with week + month."""
+    date = pd.to_datetime(dt)
+    week_num = date.strftime("W%U")
+    month_name = date.strftime("%B")
+    weekday = date.strftime("%A")
+    return f"Recorded on {weekday}, {month_name} {date.day}, {date.year} (Week {week_num})"
+
+# ------------------------ CREATE EMBEDDINGS ------------------------
+def create_vector_db():
+    df = get_data_from_db()
+    if df.empty:
+        print("⚠️ No data found in database.")
+        return
+
+    print(f"✅ Loaded {len(df)} rows from database")
+
+    client = PersistentClient(path=PERSIST_DIR)
+
+    # If collection exists, delete it for clean rebuild
+    existing_collections = [c.name for c in client.list_collections()]
+    if "api_performance_data" in existing_collections:
+        client.delete_collection("api_performance_data")
+
+    collection = client.create_collection(
+        name="api_performance_data",
+        metadata={"description": "API performance metrics with temporal context"},
+        embedding_function=embedding_functions.OllamaEmbeddingFunction(
+            model_name=EMBED_MODEL,
+            base_url=OLLAMA_URL
+        )
+    )
+
+    # Create enriched textual documents
+    texts, ids = [], []
+    for i, row in df.iterrows():
+        date_text = enrich_datetime_text(row["DateTime"])
+        doc = (
+            f"Functionality: {row['Functionality']}, API: {row['API']}, {date_text}. "
+            f"Total requests: {row['Total']}, Passed: {row['OK']}, "
+            f"Failures (KO): {row['KO']}, AverageTimeTaken(ms): {row['AverageTimeTaken']}."
+        )
+        texts.append(doc)
+        ids.append(str(i))
+
+    print("🚀 Creating embeddings...")
+    collection.add(documents=texts, ids=ids)
+
+    print("💾 Persisting Chroma database...")
+    client.persist()
+
+    print(f"✅ Vector DB successfully created and saved at: {PERSIST_DIR}")
+    print(f"📈 Total vectors stored: {collection.count()}")
+
+
+if __name__ == "__main__":
+    create_vector_db()
