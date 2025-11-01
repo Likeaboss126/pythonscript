@@ -140,3 +140,19 @@ collection = client.get_collection("api_performance_data")
 print("Loaded collection:", collection.name)
 print("Vector count:", collection.count())
 
+from chromadb import PersistentClient
+
+# 👇 use the same path you used during initialization
+client = PersistentClient(path="C:/path/to/chroma_storage1")
+
+# 👇 same collection name used earlier
+collection = client.get_or_create_collection("api_performance_data")
+
+# Fetch 1 row (you can increase n for more)
+results = collection.get(limit=1)
+
+# Print out the document and metadata
+print("=== Retrieved Record ===")
+print("IDs:", results["ids"])
+print("Documents:", results["documents"])
+print("Metadata:", results["metadatas"])
