@@ -156,3 +156,76 @@ print("=== Retrieved Record ===")
 print("IDs:", results["ids"])
 print("Documents:", results["documents"])
 print("Metadata:", results["metadatas"])
+
+
+
+import json
+import requests
+from chromadb import PersistentClient
+
+# =============== CONFIGURATION ===============
+CHROMA_PATH = r"C:\path\to\chroma_storage1"  # same folder as before
+COLLECTION_NAME = "api_performance_data"
+OLLAMA_URL = "http://localhost:11434/api/generate"  # your local Ollama endpoint
+MODEL_NAME = "llama3.2:1"  # use your locally downloaded Llama model
+TOP_K = 10  # number of most relevant chunks to fetch
+# ============================================
+
+
+def get_relevant_context(query: str, top_k: int = TOP_K):
+    """Retrieve the most semantically similar documents from the vector DB."""
+    client = PersistentClient(path=CHROMA_PATH)
+    collection = client.get_or_create_collection(COLLECTION_NAME)
+
+    results = collection.query(query_texts=[query], n_results=top_k)
+    docs = results.get("documents", [[]])[0]
+    context = "\n".join(docs)
+    return context
+
+
+def ask_llama(query: str, context: str):
+    """Send a combined query + context to local Ollama model."""
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": f"""You are an AI data analyst for API performance.
+Use the provided context to answer the question accurately.
+
+Context:
+{context}
+
+Question:
+{query}
+
+Give a concise, clear explanation in a structured way.""",
+        "stream": False
+    }
+
+    response = requests.post(OLLAMA_URL, json=payload)
+    if response.status_code != 200:
+        raise Exception(f"Ollama API error: {response.text}")
+
+    result = response.json()
+    return result.get("response", "No response from model.")
+
+
+def main():
+    st_query = input("🔍 Enter your question about API performance: ").strip()
+    if not st_query:
+        print("Please enter a valid question.")
+        return
+
+    print("\nFetching relevant data from vector database...")
+    context = get_relevant_context(st_query)
+    if not context:
+        print("No relevant data found in vector DB.")
+        return
+
+    print("\nAsking Llama model...")
+    answer = ask_llama(st_query, context)
+    print("\n=== AI ANALYSIS ===")
+    print(answer)
+
+
+if __name__ == "__main__":
+    main()
+
