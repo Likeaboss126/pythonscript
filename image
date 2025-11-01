@@ -228,4 +228,31 @@ def main():
 
 if __name__ == "__main__":
     main()
+import chromadb
+from sentence_transformers import SentenceTransformer
+
+# Load Chroma
+persist_directory = r"D:\chroma_storage"
+chroma_client = chromadb.PersistentClient(path=persist_directory)
+collection = chroma_client.get_collection("api_performance_data")
+
+# Load same local embedding model
+model_path = r"D:\models\mxbai-embed-large"
+model = SentenceTransformer(model_path)
+
+# Example user query
+query = "Compare average response time for Login API vs Search API"
+
+# Generate embedding for query
+query_embedding = model.encode([query])
+
+# Search top results
+results = collection.query(
+    query_embeddings=query_embedding,
+    n_results=5
+)
+
+print("🔍 Top results:")
+for doc in results["documents"][0]:
+    print("-", doc)
 
