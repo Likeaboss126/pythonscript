@@ -1,345 +1,41 @@
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
-import requests
-import json
+# Weekly Trend Indicators Section
 
-# -----------------------------
-# 1️⃣  Load local ChromaDB collection
-# -----------------------------
-chroma_client = chromadb.Client(Settings(persist_directory="./chroma_storage"))
-collection = chroma_client.get_collection(name="api_performance_data")
+st.subheader("📈 Weekly Trend Indicators")
 
-# -----------------------------
-# 2️⃣  Load local embedding model
-# -----------------------------
-model_path = "models/mxbai-embed-large"
-model = SentenceTransformer(model_path)
+# Use all APIs of the selected functionalities (ignore API filter)
+df_func_filtered = df[df['Functionality'].isin(selected_funcs)].copy()
 
-# -----------------------------
-# 3️⃣  Define helper function to query
-# -----------------------------
-def query_vector_db(question: str, top_k: int = 5):
-    # Create embedding for the user query
-    query_embedding = model.encode([question], convert_to_numpy=True).tolist()
+# Extract week number
+df_func_filtered['Week'] = pd.to_datetime(df_func_filtered['DateTime']).dt.isocalendar().week
 
-    # Search similar entries in vector DB
-    results = collection.query(
-        query_embeddings=query_embedding,
-        n_results=top_k
-    )
+# Get latest two weeks
+latest_weeks = sorted(df_func_filtered['Week'].unique())
+if len(latest_weeks) >= 2:
+    week1, week2 = latest_weeks[-2], latest_weeks[-1]
 
-    # Flatten context results
-    documents = results["documents"][0]
-    context = "\n".join(documents)
+    df_w1 = df_func_filtered[df_func_filtered['Week'] == week1]
+    df_w2 = df_func_filtered[df_func_filtered['Week'] == week2]
 
-    print(f"\n🔍 Top {top_k} relevant records found for query:\n➡️ {question}\n")
-    for i, doc in enumerate(documents, start=1):
-        print(f"{i}. {doc}\n")
+    # Aggregate average response per API per functionality
+    agg_w1 = df_w1.groupby(['Functionality', 'API'])['Averagetimetaken'].mean().reset_index(name='Avg_Week1')
+    agg_w2 = df_w2.groupby(['Functionality', 'API'])['Averagetimetaken'].mean().reset_index(name='Avg_Week2')
 
-    return context
+    # Merge
+    merged = pd.merge(agg_w1, agg_w2, on=['Functionality', 'API'])
+    merged['Change %'] = ((merged['Avg_Week2'] - merged['Avg_Week1']) / merged['Avg_Week1']) * 100
 
+    # Keep only ±2% changes
+    merged = merged[merged['Change %'].abs() >= 2]
 
-# -----------------------------
-# 4️⃣  Optionally, summarize using local Ollama (LLaMA)
-# -----------------------------
-def ask_ollama(context: str, question: str):
-    payload = {
-        "model": "llama3",
-        "prompt": f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer concisely based on the data:",
-        "stream": False
-    }
+    # Add colored arrows
+    def trend(row):
+        if row['Change %'] > 0:
+            return f"🔴⬇️ Degraded by {abs(row['Change %']):.2f}%"
+        else:
+            return f"🟢⬆️ Improved by {abs(row['Change %']):.2f}%"
 
-    try:
-        response = requests.post("http://localhost:11434/api/generate", json=payload)
-        data = response.json()
-        print("\n🧠 AI Answer:\n")
-        print(data.get("response", "No answer generated."))
-    except Exception as e:
-        print(f"⚠️ Error calling Ollama: {e}")
+    merged['Trend'] = merged.apply(trend, axis=1)
 
-
-# -----------------------------
-# 5️⃣  Run query interactively
-# -----------------------------
-if __name__ == "__main__":
-    print("💡 Example questions you can ask:")
-    print(" - Which API failed the most this week?")
-    print(" - Which functionality has the slowest average response time?")
-    print(" - List APIs with more than 5 failures.")
-    print()
-
-    question = input("Enter your question: ").strip()
-    if not question:
-        print("❌ No question entered. Exiting.")
-        exit()
-
-    # Get context from ChromaDB
-    context_data = query_vector_db(question, top_k=5)
-
-    # Optionally send to LLaMA for summary
-    ask_ollama(context_data, question)
-
-
-chroma_client = chromadb.Client(Settings(persist_directory="./chroma_storage"))
-print("Available collections:", chroma_client.list_collections())
-
-
-from langchain_chroma import Chroma
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain.docstore.document import Document
-import os
-
-persist_directory = r"C:\Users\Mudit\Documents\chroma_storage1"
-os.makedirs(persist_directory, exist_ok=True)
-
-embedding_model = OllamaEmbeddings(model="mxbai-embed-large")
-
-docs = [Document(page_content="Hello world", metadata={"id": 1})]
-
-db = Chroma.from_documents(
-    documents=docs,
-    embedding=embedding_model,
-    persist_directory=persist_directory
-)
-db.persist()
-
-print("✅ Done. Check folder:", persist_directory)
-
-
-
-from sentence_transformers import SentenceTransformer
-import chromadb
-from chromadb.config import Settings
-
-MODEL_PATH = r"C:\path\to\models\mxbai-embed-large"   # change to your local folder
-PERSIST_DIR = r"C:\Users\Mudit\chroma_store"           # change to absolute path you want
-
-# load model from local folder (no internet)
-embedder = SentenceTransformer(MODEL_PATH)
-
-client = chromadb.Client(Settings(persist_directory=PERSIST_DIR))
-collection = client.get_or_create_collection("api_performance_data")
-
-# Example docs
-docs = ["API /login failed 5 times", "API /orders average 200ms"]
-ids = ["d1", "d2"]
-
-# Build embeddings locally then store
-embeddings = embedder.encode(docs, convert_to_numpy=True).tolist()
-collection.add(ids=ids, documents=docs, embeddings=embeddings)
-client.persist()
-print("Persisted to", PERSIST_DIR)
-
-
-import chromadb
-
-client = chromadb.PersistentClient(path="./chroma_storage")
-collection = client.get_collection("api_performance_data")
-
-print("Loaded collection:", collection.name)
-print("Vector count:", collection.count())
-
-from chromadb import PersistentClient
-
-# 👇 use the same path you used during initialization
-client = PersistentClient(path="C:/path/to/chroma_storage1")
-
-# 👇 same collection name used earlier
-collection = client.get_or_create_collection("api_performance_data")
-
-# Fetch 1 row (you can increase n for more)
-results = collection.get(limit=1)
-
-# Print out the document and metadata
-print("=== Retrieved Record ===")
-print("IDs:", results["ids"])
-print("Documents:", results["documents"])
-print("Metadata:", results["metadatas"])
-
-
-
-import json
-import requests
-from chromadb import PersistentClient
-
-# =============== CONFIGURATION ===============
-CHROMA_PATH = r"C:\path\to\chroma_storage1"  # same folder as before
-COLLECTION_NAME = "api_performance_data"
-OLLAMA_URL = "http://localhost:11434/api/generate"  # your local Ollama endpoint
-MODEL_NAME = "llama3.2:1"  # use your locally downloaded Llama model
-TOP_K = 10  # number of most relevant chunks to fetch
-# ============================================
-
-
-def get_relevant_context(query: str, top_k: int = TOP_K):
-    """Retrieve the most semantically similar documents from the vector DB."""
-    client = PersistentClient(path=CHROMA_PATH)
-    collection = client.get_or_create_collection(COLLECTION_NAME)
-
-    results = collection.query(query_texts=[query], n_results=top_k)
-    docs = results.get("documents", [[]])[0]
-    context = "\n".join(docs)
-    return context
-
-
-def ask_llama(query: str, context: str):
-    """Send a combined query + context to local Ollama model."""
-    payload = {
-        "model": MODEL_NAME,
-        "prompt": f"""You are an AI data analyst for API performance.
-Use the provided context to answer the question accurately.
-
-Context:
-{context}
-
-Question:
-{query}
-
-Give a concise, clear explanation in a structured way.""",
-        "stream": False
-    }
-
-    response = requests.post(OLLAMA_URL, json=payload)
-    if response.status_code != 200:
-        raise Exception(f"Ollama API error: {response.text}")
-
-    result = response.json()
-    return result.get("response", "No response from model.")
-
-
-def main():
-    st_query = input("🔍 Enter your question about API performance: ").strip()
-    if not st_query:
-        print("Please enter a valid question.")
-        return
-
-    print("\nFetching relevant data from vector database...")
-    context = get_relevant_context(st_query)
-    if not context:
-        print("No relevant data found in vector DB.")
-        return
-
-    print("\nAsking Llama model...")
-    answer = ask_llama(st_query, context)
-    print("\n=== AI ANALYSIS ===")
-    print(answer)
-
-
-if __name__ == "__main__":
-    main()
-import chromadb
-from sentence_transformers import SentenceTransformer
-
-# Load Chroma
-persist_directory = r"D:\chroma_storage"
-chroma_client = chromadb.PersistentClient(path=persist_directory)
-collection = chroma_client.get_collection("api_performance_data")
-
-# Load same local embedding model
-model_path = r"D:\models\mxbai-embed-large"
-model = SentenceTransformer(model_path)
-
-# Example user query
-query = "Compare average response time for Login API vs Search API"
-
-# Generate embedding for query
-query_embedding = model.encode([query])
-
-# Search top results
-results = collection.query(
-    query_embeddings=query_embedding,
-    n_results=5
-)
-
-print("🔍 Top results:")
-for doc in results["documents"][0]:
-    print("-", doc)
-
-import pandas as pd
-import datetime
-from chromadb import PersistentClient
-from chromadb.utils import embedding_functions
-import psycopg2
-
-# ------------------------ CONFIG ------------------------
-PERSIST_DIR = r"C:\path\to\chroma_storage"  # ✅ Change to your folder
-DB_CONFIG = {
-    "dbname": "your_dbname",
-    "user": "your_user",
-    "password": "your_password",
-    "host": "your_host",
-    "port": 5432
-}
-EMBED_MODEL = "mxbai-embed-large"  # Your local embedding model
-OLLAMA_URL = "http://localhost:11434"  # Ollama local endpoint
-
-# ------------------------ DB CONNECTION ------------------------
-def get_data_from_db():
-    conn = psycopg2.connect(**DB_CONFIG)
-    query = """
-        SELECT Functionality, API, "DateTime", Total, OK, KO, "AverageTimeTaken"
-        FROM data;
-    """
-    df = pd.read_sql(query, conn)
-    conn.close()
-    return df
-
-# ------------------------ ENRICH DATETIME ------------------------
-def enrich_datetime_text(dt):
-    """Convert precise datetime into readable text with week + month."""
-    date = pd.to_datetime(dt)
-    week_num = date.strftime("W%U")
-    month_name = date.strftime("%B")
-    weekday = date.strftime("%A")
-    return f"Recorded on {weekday}, {month_name} {date.day}, {date.year} (Week {week_num})"
-
-# ------------------------ CREATE EMBEDDINGS ------------------------
-def create_vector_db():
-    df = get_data_from_db()
-    if df.empty:
-        print("⚠️ No data found in database.")
-        return
-
-    print(f"✅ Loaded {len(df)} rows from database")
-
-    client = PersistentClient(path=PERSIST_DIR)
-
-    # If collection exists, delete it for clean rebuild
-    existing_collections = [c.name for c in client.list_collections()]
-    if "api_performance_data" in existing_collections:
-        client.delete_collection("api_performance_data")
-
-    collection = client.create_collection(
-        name="api_performance_data",
-        metadata={"description": "API performance metrics with temporal context"},
-        embedding_function=embedding_functions.OllamaEmbeddingFunction(
-            model_name=EMBED_MODEL,
-            base_url=OLLAMA_URL
-        )
-    )
-
-    # Create enriched textual documents
-    texts, ids = [], []
-    for i, row in df.iterrows():
-        date_text = enrich_datetime_text(row["DateTime"])
-        doc = (
-            f"Functionality: {row['Functionality']}, API: {row['API']}, {date_text}. "
-            f"Total requests: {row['Total']}, Passed: {row['OK']}, "
-            f"Failures (KO): {row['KO']}, AverageTimeTaken(ms): {row['AverageTimeTaken']}."
-        )
-        texts.append(doc)
-        ids.append(str(i))
-
-    print("🚀 Creating embeddings...")
-    collection.add(documents=texts, ids=ids)
-
-    print("💾 Persisting Chroma database...")
-    client.persist()
-
-    print(f"✅ Vector DB successfully created and saved at: {PERSIST_DIR}")
-    print(f"📈 Total vectors stored: {collection.count()}")
-
-
-if __name__ == "__main__":
-    create_vector_db()
+    st.dataframe(merged[['Functionality', 'API', 'Avg_Week1', 'Avg_Week2', 'Trend']], use_container_width=True)
+else:
+    st.info("Not enough weekly data for comparison.")
