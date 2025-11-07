@@ -1,0 +1,48 @@
+package perf;
+
+import com.intuit.karate.gatling.javaapi.PreDef;
+import io.gatling.javaapi.core.*;
+import scala.concurrent.duration.Duration;
+
+import java.util.concurrent.TimeUnit;
+
+import static io.gatling.javaapi.core.CoreDsl.*;
+import static com.intuit.karate.gatling.javaapi.PreDef.*;
+
+public class SimpleSimulation extends Simulation {
+
+    public SimpleSimulation() {
+
+        // 🔹 Load CSV test data — each row is unique per virtual user
+        FeederBuilder.FileBased<Object> feeder = csv("userData.csv").queue();
+
+        // 🔹 Define Karate scenario
+        ScenarioBuilder karateScenario = scenario("UserRampUpConstant")
+                .feed(feeder)
+                .forever() // each user keeps looping
+                .on(
+                    exec(karateFeature("classpath:perf/simple.feature"))
+                    .pause(1, 3) // think time between loops
+                );
+
+        // 🔹 Define load pattern
+        setUp(
+            karateScenario.injectOpen(
+                // 5 users added per minute for 10 minutes → 50 total
+                incrementUsersPerSec(5)
+                    .times(10)
+                    .eachLevelLasting(60)
+                    .separatedByRampsLasting(0)
+                    .startingFrom(0),
+
+                // 🔸 After ramp-up, hold constant 50 users for 10 more minutes
+                constantUsersPerSec(50)
+                    .during(Duration.create(10, TimeUnit.MINUTES))
+            )
+        ).protocols(karateProtocol)
+         .maxDuration(Duration.create(20, TimeUnit.MINUTES)); // 10 ramp + 10 steady
+    }
+}
+
+
+* if (karate.prevResponseStatus != 200) karate.log('❌ Failed critical API for username:', user.username, 'Status:', karate.prevResponseStatus, 'Response:', response)
