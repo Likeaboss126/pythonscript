@@ -1,47 +1,52 @@
-# init_vector_db.py
-import pandas as pd
-import psycopg2
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.document_loaders import DataFrameLoader
-from langchain_community.vectorstores import Chroma
+st.subheader("📈 Weekly Trend Indicators (Avg > 2000ms)")
 
-# --- 1. Connect to PostgreSQL ---
-conn = psycopg2.connect(
-    dbname="your_dbname",
-    user="your_user",
-    password="your_password",
-    host="your_host",
-    port="5432"
-)
+# Filter by selected functionalities only — include all APIs under them
+df_func_filtered = df[df['Functionality'].isin(selected_funcs)].copy()
 
-query = """
-SELECT Functionality, DateTime, API, Total, Passed, Failed, AverageTimeTaken
-FROM data;
-"""
-df = pd.read_sql(query, conn)
-conn.close()
+# Convert to week number
+df_func_filtered['Week'] = pd.to_datetime(df_func_filtered['DateTime']).dt.isocalendar().week
 
-# --- 2. Convert each record into text for embedding ---
-df["text"] = df.apply(
-    lambda r: (
-        f"On {r.DateTime}, Functionality '{r.Functionality}' had API '{r.API}' "
-        f"with {r.Total} total calls, {r.Passed} passed, {r.Failed} failed, "
-        f"and an average response time of {r.AverageTimeTaken} ms."
-    ),
-    axis=1
-)
+# Identify the latest two weeks available
+latest_weeks = sorted(df_func_filtered['Week'].unique())
+if len(latest_weeks) >= 2:
+    week1, week2 = latest_weeks[-2], latest_weeks[-1]
 
-# --- 3. Load DataFrame into LangChain Documents ---
-loader = DataFrameLoader(df, page_content_column="text")
-docs = loader.load()
+    # Split data
+    df_w1 = df_func_filtered[df_func_filtered['Week'] == week1]
+    df_w2 = df_func_filtered[df_func_filtered['Week'] == week2]
 
-# --- 4. Create embeddings and save to Chroma (persistent) ---
-embeddings = OllamaEmbeddings(model="nomic-embed-text")
+    # Aggregate average response per API per functionality
+    agg_w1 = df_w1.groupby(['Functionality', 'API'])['Averagetimetaken'].mean().reset_index(name='Avg_Week1')
+    agg_w2 = df_w2.groupby(['Functionality', 'API'])['Averagetimetaken'].mean().reset_index(name='Avg_Week2')
 
-vectorstore = Chroma.from_documents(
-    documents=docs,
-    embedding=embeddings,
-    persist_directory="./api_perf_chroma"
-)
-vectorstore.persist()
-print("✅ Vector DB created and stored at ./api_perf_chroma")
+    # Merge
+    merged = pd.merge(agg_w1, agg_w2, on=['Functionality', 'API'])
+
+    # Calculate % change
+    merged['Change %'] = ((merged['Avg_Week2'] - merged['Avg_Week1']) / merged['Avg_Week1']) * 100
+
+    # ✅ Filter only APIs where latest week average > 2000 ms
+    merged = merged[merged['Avg_Week2'] > 2000]
+
+    # Optional: Keep only significant changes (e.g., > ±2%)
+    merged = merged[merged['Change %'].abs() >= 2]
+
+    # Add trend indicators
+    def trend(row):
+        if row['Change %'] > 0:
+            return f"🔴⬇️ Slower by {abs(row['Change %']):.2f}%"
+        else:
+            return f"🟢⬆️ Faster by {abs(row['Change %']):.2f}%"
+
+    merged['Trend'] = merged.apply(trend, axis=1)
+
+    # Sort by latest week average descending (most problematic first)
+    merged = merged.sort_values(by='Avg_Week2', ascending=False)
+
+    # Display result
+    st.dataframe(
+        merged[['Functionality', 'API', 'Avg_Week1', 'Avg_Week2', 'Change %', 'Trend']],
+        use_container_width=True
+    )
+else:
+    st.info("Not enough weekly data for comparison.")
