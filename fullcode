@@ -77,3 +77,84 @@ def index_data(records: List[Dict]):
 if __name__ == "__main__":
     synthetic_data = generate_synthetic_data(NUM_RECORDS)
     index_data(synthetic_data)
+
+
+
+
+from tqdm import tqdm
+from typing import List, Dict, Any
+import chromadb
+from sentence_transformers import SentenceTransformer 
+# Import the library needed to load the model
+
+# --- Configuration ---
+COLLECTION_NAME = "api_performance_v5"
+DB_PATH = "./chroma_db_performance_v5"
+BATCH_SIZE = 500
+
+# 1. Load the specific model you downloaded
+# If the model is in a local directory, replace the name with the path:
+# E.g., model_path = '/path/to/local/mxbai-embed-large'
+EMBEDDING_MODEL_NAME = 'mixedbread-ai/mxbai-embed-large-v1' # Or local path
+
+try:
+    # Load the model using SentenceTransformer. This will use your local copy.
+    embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    # mxbai-embed-large outputs 1024 dimensions (Source 2.1)
+    print(f"Successfully loaded embedding model: {EMBEDDING_MODEL_NAME}. Output dimension: 1024")
+except Exception as e:
+    print(f"Error loading {EMBEDDING_MODEL_NAME}: {e}")
+    # Fallback to the default if the local load fails
+    embedding_model = None 
+
+
+def index_data_batched(records: List[Dict]):
+    if not embedding_model:
+        print("Embedding model failed to load. Cannot proceed with indexing.")
+        return
+
+    print(f"Initializing ChromaDB at {DB_PATH}...")
+    client = chromadb.PersistentClient(path=DB_PATH)
+    
+    # --- Prepare Data ---
+    texts = [r["document"] for r in records]
+    metadatas = [r["metadata"] for r in records]
+    ids = [r["id"] for r in records]
+
+    # --- Create Collection without an explicit embedding_function ---
+    # We will provide the embeddings directly, so Chroma skips the auto-generation step.
+    try:
+        client.delete_collection(name=COLLECTION_NAME)
+    except Exception:
+        pass
+        
+    collection = client.get_or_create_collection(name=COLLECTION_NAME) 
+    
+    # --- Batching and Encoding Loop ---
+    for i in tqdm(range(0, len(texts), BATCH_SIZE), desc="Embedding batches"):
+        batch_texts = texts[i:i + BATCH_SIZE]
+        batch_metadatas = metadatas[i:i + BATCH_SIZE]
+        batch_ids = ids[i:i + BATCH_SIZE]
+
+        # 2. Use the local model to encode the documents
+        # This is where your dedicated model is utilized
+        embeddings = embedding_model.encode(
+            batch_texts, 
+            convert_to_numpy=True
+        ).tolist() # Convert numpy array back to list of floats for ChromaDB
+
+        # 3. Add to ChromaDB
+        try:
+            collection.add(
+                ids=batch_ids,
+                documents=batch_texts,
+                metadatas=batch_metadatas,
+                embeddings=embeddings # Provide the pre-calculated embeddings
+            )
+        except Exception as e:
+             print(f"\nChromaDB add error on batch {i // BATCH_SIZE + 1}: {e}")
+             break
+        
+    print(f"\nIndexing complete. Total records: {collection.count()}")
+
+# Example call: index_data_batched(synthetic_data)
