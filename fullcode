@@ -15,146 +15,82 @@ NUM_RECORDS = 5000
 API_LIST = ["POST /login", "GET /userProfile", "POST /submitOrder", "GET /productDetails"]
 FUNCTIONALITY_LIST = ["Authentication", "UserManagement", "OrderProcessing", "Catalog"]
 RelativePeriod = Literal['TODAY', 'YESTERDAY', 'LAST_7_DAYS', 'LAST_30_DAYS', 'LAST_MONTH']
-
-def generate_synthetic_data(count):
-    records = []
-
-    for i in range(1, count + 1):
-        api = random.choice(API_LIST)
-        func = FUNCTIONALITY_LIST[API_LIST.index(api)]
-
-        # Numeric Fields (Simulating different data across last 60 days)
-        total = random.randint(100, 2000)
-        failed = random.choices([0, 1, 5, 20, 100], weights=[60, 15, 10, 8, 7])[0]
-        avg_time = random.uniform(2000.0, 5000.0) if failed >= 20 else random.uniform(50.0, 800.0)
-
-        start_date = datetime.now() - timedelta(days=60)
-        execution_time = start_date + timedelta(seconds=random.randint(0, 60 * 24 * 60 * 60))
-
-        metadata = {
-            "functionality": func,
-            "api": api,
-            "total": total,
-            "passed": total - failed,
-            "failed": failed,
-            "averagetimetaken": round(avg_time, 2),
-            "datetime": execution_time.isoformat(),
-            "datetime_epoch": int(execution_time.timestamp()),  # Numeric for filtering
-        }
-
-        records.append({
-            "id": f"run_{i}",
-            "document": f"Performance metrics for {func} suite, {api} endpoint. Status: {'Critical' if failed > 20 else 'Normal'}.",
-            "metadata": metadata
-        })
-    file_path = "my_list_data.json"
-
-    with open(file_path, 'w', encoding='utf-8') as json_file:
-        json.dump(records, json_file, indent=4, ensure_ascii=False)
-
-    print(f"List saved to {file_path}")
-    return records
+ollama_client = Client(host=OLLAMA_HOST)
 
 
-def index_data(records: List[Dict]):
-    print(f"Initializing ChromaDB at {DB_PATH}...")
-    client = chromadb.PersistentClient(path=DB_PATH)
-    try:
-        client.delete_collection(name=COLLECTION_NAME)
-    except Exception:
-        pass
+def handle_user_query_ollama(user_query: str):
+    messages = [
+        {"role": "system",
+         "content": "You are an expert performance analysis RAG agent. You must use the 'build_chroma_filter' tool. "
+    "Crucially, if the user specifies a relative time period (e.g., 'today', 'yesterday', 'last week'), "
+    "you MUST calculate the date in this format YYYY-MM-DDTHH:MM:SS for  'period_start' and 'period_end' arguments "
+                    "Do not Add API filter if user has not provided any API in query"
+    "For instance, 'yesterday' should be calculated as yesterday's start time and yesterday's end time. "
+    "For instance, 'today' should be calculated as today's start time and today's end time. "
+    "If no end time is specified (e.g., 'since last Monday'), only populate 'period_start'. "
+    "DO NOT answer the question directly; provide the tool call only." 
+                    "If the query is a specific trend comparison (e.g., 'compare this month to last month'), "
+                    "note that you will need to run the analysis in a separate step, "
+                    "but try to parse the primary filter for the API/time frame first. "
+                    "For 'analyze today's stats', use a filter that captures all runs today with failed > 0 OR averagetimetaken > 3000ms."},
+        {"role": "user", "content": user_query},
+    ]
 
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
-
-    collection.add(
-        documents=[r["document"] for r in records],
-        metadatas=[r["metadata"] for r in records],
-        ids=[r["id"] for r in records],
+    # Initial LLM call to decide on tool use
+    response: ChatResponse = ollama_client.chat(
+        model=OLLAMA_MODEL,
+        messages=messages,
+        tools=[build_chroma_filter],
+        # Llama 3 models are generally very good at tool calling
     )
-    print(f"Indexing complete. Total records: {collection.count()}")
+
+def build_chroma_filter(
+        api: Optional[str] = None,
+        functionality: Optional[str] = None,
+        failed_op: Optional[str] = None,
+        failed_val: Optional[int] = None,
+        time_op: Optional[str] = None,
+        time_val: Optional[float] = None,
+        period_start: Optional[str] = None,
+        period_end: Optional[str] = None,
+        period_type: Optional[RelativePeriod] = None, # Expects one of the literal values
+) -> str:
+    """
+    Analyzes user intent and builds a ChromaDB filter dictionary for the 'where' clause.
+
+    Args:
+        api: The specific API endpoint name (e.g., 'POST /login').
+        functionality: The high-level functionality (e.g., 'OrderProcessing').
+        failed_op: The comparison operator for failures ('$gt', '$lt', '$eq').
+        failed_val: The numerical value for the failures' comparison.
+        time_op: The comparison operator for averagetimetaken ('$gt', '$lt', '$eq').
+        time_val: The numerical value (in ms) for the time comparison.
+        period_start: The start date of the period as an ISO 8601 string (YYYY-MM-DDTHH:MM:SS).
+        period_end: The end date of the period as an ISO 8601 string (YYYY-MM-DDTHH:MM:SS).
+        period_type: The relative time period specified by the user ('TODAY', 'YESTERDAY', 'LAST_7_DAYS', etc.).
+    Returns:
+        A JSON string of the structured ChromaDB filter.
+    """
+
+    # This function is not executed directly by the LLM. It's the schema the LLM uses.
+    # The actual filter creation happens within the Python code after the LLM call.
+    return json.dumps({
+        "api": api, "functionality": functionality,
+        "failed_op": failed_op, "failed_val": failed_val,
+        "time_op": time_op, "time_val": time_val,
+        "period_start": period_start, "period_end": period_end,
+        "period_type": period_type
+    })
+
 
 
 if __name__ == "__main__":
-    synthetic_data = generate_synthetic_data(NUM_RECORDS)
-    index_data(synthetic_data)
 
+    # A. Index the data first
+    print("\n" + "=" * 80)
+    print(f"DEMONSTRATING QUERIES VIA OLLAMA ({OLLAMA_MODEL}) FUNCTION CALLING")
+    print("=" * 80)
 
-
-
-from tqdm import tqdm
-from typing import List, Dict, Any
-import chromadb
-from sentence_transformers import SentenceTransformer 
-# Import the library needed to load the model
-
-# --- Configuration ---
-COLLECTION_NAME = "api_performance_v5"
-DB_PATH = "./chroma_db_performance_v5"
-BATCH_SIZE = 500
-
-# 1. Load the specific model you downloaded
-# If the model is in a local directory, replace the name with the path:
-# E.g., model_path = '/path/to/local/mxbai-embed-large'
-EMBEDDING_MODEL_NAME = 'mixedbread-ai/mxbai-embed-large-v1' # Or local path
-
-try:
-    # Load the model using SentenceTransformer. This will use your local copy.
-    embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-    # mxbai-embed-large outputs 1024 dimensions (Source 2.1)
-    print(f"Successfully loaded embedding model: {EMBEDDING_MODEL_NAME}. Output dimension: 1024")
-except Exception as e:
-    print(f"Error loading {EMBEDDING_MODEL_NAME}: {e}")
-    # Fallback to the default if the local load fails
-    embedding_model = None 
-
-
-def index_data_batched(records: List[Dict]):
-    if not embedding_model:
-        print("Embedding model failed to load. Cannot proceed with indexing.")
-        return
-
-    print(f"Initializing ChromaDB at {DB_PATH}...")
-    client = chromadb.PersistentClient(path=DB_PATH)
-    
-    # --- Prepare Data ---
-    texts = [r["document"] for r in records]
-    metadatas = [r["metadata"] for r in records]
-    ids = [r["id"] for r in records]
-
-    # --- Create Collection without an explicit embedding_function ---
-    # We will provide the embeddings directly, so Chroma skips the auto-generation step.
-    try:
-        client.delete_collection(name=COLLECTION_NAME)
-    except Exception:
-        pass
-        
-    collection = client.get_or_create_collection(name=COLLECTION_NAME) 
-    
-    # --- Batching and Encoding Loop ---
-    for i in tqdm(range(0, len(texts), BATCH_SIZE), desc="Embedding batches"):
-        batch_texts = texts[i:i + BATCH_SIZE]
-        batch_metadatas = metadatas[i:i + BATCH_SIZE]
-        batch_ids = ids[i:i + BATCH_SIZE]
-
-        # 2. Use the local model to encode the documents
-        # This is where your dedicated model is utilized
-        embeddings = embedding_model.encode(
-            batch_texts, 
-            convert_to_numpy=True
-        ).tolist() # Convert numpy array back to list of floats for ChromaDB
-
-        # 3. Add to ChromaDB
-        try:
-            collection.add(
-                ids=batch_ids,
-                documents=batch_texts,
-                metadatas=batch_metadatas,
-                embeddings=embeddings # Provide the pre-calculated embeddings
-            )
-        except Exception as e:
-             print(f"\nChromaDB add error on batch {i // BATCH_SIZE + 1}: {e}")
-             break
-        
-    print(f"\nIndexing complete. Total records: {collection.count()}")
-
-# Example call: index_data_batched(synthetic_data)
+    # 1. SPECIFIC FILTER QUERY (Handled via tool call and single search)
+    handle_user_query_ollama("APIs with more than 2000 milli seconds response time and more than 25 failures on 25th September 2025")
+    # handle_user_query_ollama("pl
