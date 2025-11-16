@@ -1,22 +1,47 @@
-# Modelfile
-# 1. Base Model: Points to the Safetensors files in the local directory
-FROM . 
+import ollama
+from ollama import Client
 
-# 2. Context Window: CRITICAL for the 128K version
-# This ensures Ollama allocates the massive memory required for 128,000 tokens.
-PARAMETER num_ctx 128000
+# --- Configuration ---
+# Use the correct host and port for your Docker setup
+OLLAMA_HOST = 'http://localhost:11434' 
+MODEL_NAME = 'phi3-medium-custom'  # Use the custom name you defined in your Modelfile
 
-# 3. Chat Format Template: CRITICAL for Instruct Models
-# This tells the model how to interpret the user's prompt (the "chat format").
-# The model was trained with these specific tags.
-TEMPLATE """
-<|user|>
-{{ .Prompt }}<|end|>
-<|assistant|>
-"""
+def check_ollama_and_model(host: str, model_name: str):
+    """Checks connection to Ollama and runs a simple query on the model."""
+    try:
+        # 1. Check Service Reachability
+        client = Client(host=host)
+        
+        # Check if the Ollama service is alive (basic API call)
+        # client.list() will throw an error if the service is unreachable
+        available_models = [m['name'] for m in client.list()['models']]
+        print(f"✅ Ollama service is reachable at {host}")
+        
+        if f"{model_name}:latest" not in available_models and model_name not in available_models:
+            print(f"⚠️ Model '{model_name}' not found in available models:")
+            print(available_models)
+            return
+        
+        print(f"✅ Model '{model_name}' found locally.")
+        
+        # 2. Check Model Functionality (Simple Chat)
+        print("\nTesting model response...")
+        response = client.chat(
+            model=model_name,
+            messages=[{'role': 'user', 'content': 'What is your name?'}]
+        )
+        
+        model_response = response['message']['content']
+        print(f"✅ Model responded successfully. Sample output: '{model_response[:40]}...'")
+        
+    except ollama.OllamaAPIError as e:
+        print(f"❌ Ollama API Error: The model may not be loaded or the model name is incorrect.")
+        print(f"Error details: {e}")
+    except ConnectionRefusedError:
+        print(f"❌ Connection Error: Ollama Docker container is not running or is not accessible at {host}.")
+        print("Please check your Docker container status and port mapping.")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {e}")
 
-# 4. Stop Sequences: Tells the model where to stop generating text.
-# Crucial for preventing the model from starting the next turn immediately.
-PARAMETER stop <|end|>
-PARAMETER stop <|user|>
-PARAMETER stop <|assistant|>
+if __name__ == "__main__":
+    check_ollama_and_model(OLLAMA_HOST, MODEL_NAME)
