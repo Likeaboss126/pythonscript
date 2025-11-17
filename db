@@ -71,3 +71,10 @@ var jsonLine = JSON.stringify(entry) + '\n';
 
 
 
+
+
+
+var FileWriter = Java.type('java.io.FileWriter');
+    var file = new FileWriter('failures.jsonl', true); // true = append mode
+    file.write(JSON.stringify(entry) + '\\n');
+    file.close();
