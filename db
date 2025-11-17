@@ -56,5 +56,12 @@ grep "OK" target/gatling/<simulation-name>-<timestamp>/simulation.log > simulati
 mvn gatling:test -Dgatling.noRun=true -Dgatling.reportsOnly=target/gatling/<simulation-name>-<timestamp>
 Select-String "OK" target/gatling/<simulation-name>-<timestamp>/simulation.log | ForEach-Object { $_.Line } > simulation_passed.log
 
-
+* if (karate.prevResponseStatus != 200) 
+    karate.write({
+      api: karate.scenario.name,
+      url: requestUrl,
+      status: karate.prevResponseStatus,
+      body: karate.prevResponse,
+      timestamp: new Date().toISOString()
+    }, 'failures.jsonl')
 
