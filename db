@@ -1,80 +1,33 @@
-import ollama
-from ollama import Client
+# Modelfile
+# 1. Source: Points to your single, merged GGUF file
+FROM ./merged_phi3_4k.gguf
 
-# --- Configuration ---
-# Use the correct host and port for your Docker setup
-OLLAMA_HOST = 'http://localhost:11434' 
-MODEL_NAME = 'phi3-medium-custom'  # Use the custom name you defined in your Modelfile
+# 2. PARAMETERS (Essential)
+PARAMETER num_ctx 4096
+PARAMETER stop <|end|>
+PARAMETER stop <|user|>
+PARAMETER stop <|assistant|>
+PARAMETER stop <|tool_response|>
 
-def check_ollama_and_model(host: str, model_name: str):
-    """Checks connection to Ollama and runs a simple query on the model."""
-    try:
-        # 1. Check Service Reachability
-        client = Client(host=host)
-        
-        # Check if the Ollama service is alive (basic API call)
-        # client.list() will throw an error if the service is unreachable
-        available_models = [m['name'] for m in client.list()['models']]
-        print(f"✅ Ollama service is reachable at {host}")
-        
-        if f"{model_name}:latest" not in available_models and model_name not in available_models:
-            print(f"⚠️ Model '{model_name}' not found in available models:")
-            print(available_models)
-            return
-        
-        print(f"✅ Model '{model_name}' found locally.")
-        
-        # 2. Check Model Functionality (Simple Chat)
-        print("\nTesting model response...")
-        response = client.chat(
-            model=model_name,
-            messages=[{'role': 'user', 'content': 'What is your name?'}]
-        )
-        
-        model_response = response['message']['content']
-        print(f"✅ Model responded successfully. Sample output: '{model_response[:40]}...'")
-        
-    except ollama.OllamaAPIError as e:
-        print(f"❌ Ollama API Error: The model may not be loaded or the model name is incorrect.")
-        print(f"Error details: {e}")
-    except ConnectionRefusedError:
-        print(f"❌ Connection Error: Ollama Docker container is not running or is not accessible at {host}.")
-        print("Please check your Docker container status and port mapping.")
-    except Exception as e:
-        print(f"❌ An unexpected error occurred: {e}")
-
-if __name__ == "__main__":
-    check_ollama_and_model(OLLAMA_HOST, MODEL_NAME)
-
-
-
-
-
-
-grep "OK" target/gatling/<simulation-name>-<timestamp>/simulation.log > simulation_passed.log
-
-mvn gatling:test -Dgatling.noRun=true -Dgatling.reportsOnly=target/gatling/<simulation-name>-<timestamp>
-Select-String "OK" target/gatling/<simulation-name>-<timestamp>/simulation.log | ForEach-Object { $_.Line } > simulation_passed.log
-
-* if (karate.prevResponseStatus != 200) 
-    karate.write({
-      api: karate.scenario.name,
-      url: requestUrl,
-      status: karate.prevResponseStatus,
-      body: karate.prevResponse,
-      timestamp: new Date().toISOString()
-    }, 'failures.jsonl')
-
-
-var jsonLine = JSON.stringify(entry) + '\n';
-    karate.appendToFile('failures.jsonl', jsonLine);
-
-
-
-
-
-
-var FileWriter = Java.type('java.io.FileWriter');
-    var file = new FileWriter('failures.jsonl', true); // true = append mode
-    file.write(JSON.stringify(entry) + '\\n');
-    file.close();
+# 3. TEMPLATE (CRITICAL FIX for Instruct/Tooling)
+# This forces the template that Phi-3 was trained on for instruction and tool use.
+TEMPLATE """
+{{- if .System }}<|system|>{{ .System }}<|end|>{{- endif -}}
+{{- if .ToolCalls -}}
+  <|tool_calls|>
+  {{- range .ToolCalls -}}
+    {{- if .ID }}
+      <|tool_call_id|>{{ .ID }}<|end|>
+    {{- else }}
+      <|tool_call|>
+      {"name":"{{ .Name }}", "arguments":{{ .Arguments }}}
+      <|end|>
+    {{- end -}}
+  {{- end -}}
+  <|end|>
+{{- end -}}
+<|user|>{{ .Prompt }}<|end|>
+{{- if .Response }}
+<|assistant|>{{ .Response }}<|end|>
+{{- end }}
+"""
