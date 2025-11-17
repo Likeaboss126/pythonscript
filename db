@@ -65,3 +65,9 @@ Select-String "OK" target/gatling/<simulation-name>-<timestamp>/simulation.log |
       timestamp: new Date().toISOString()
     }, 'failures.jsonl')
 
+
+var jsonLine = JSON.stringify(entry) + '\n';
+    karate.appendToFile('failures.jsonl', jsonLine);
+
+
+
