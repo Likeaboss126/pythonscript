@@ -45,3 +45,16 @@ def check_ollama_and_model(host: str, model_name: str):
 
 if __name__ == "__main__":
     check_ollama_and_model(OLLAMA_HOST, MODEL_NAME)
+
+
+
+
+
+
+grep "OK" target/gatling/<simulation-name>-<timestamp>/simulation.log > simulation_passed.log
+
+mvn gatling:test -Dgatling.noRun=true -Dgatling.reportsOnly=target/gatling/<simulation-name>-<timestamp>
+Select-String "OK" target/gatling/<simulation-name>-<timestamp>/simulation.log | ForEach-Object { $_.Line } > simulation_passed.log
+
+
+
