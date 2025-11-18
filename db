@@ -97,3 +97,65 @@ def execute_chroma_query(
     )
 
     return search_results['metadatas'][0] if search_results['metadatas'] else []
+
+
+
+
+def _create_chroma_filter_dict(llm_args: dict, apply_default_anomaly: bool = False) -> Dict[str, Any]:
+    """Converts LLM arguments to the nested ChromaDB filter structure."""
+
+    final_filter_list = []
+    start_iso, end_iso = None, None
+    if period_type := llm_args.get("period_type"):
+        start_iso, end_iso = calculate_date_range(period_type)
+
+    if start_iso:
+        # Convert the calculated ISO string to epoch
+        start_epoch = int(datetime.fromisoformat(start_iso.replace('Z', '+00:00')).timestamp())
+        start_condition = {"datetime_epoch": {"$gte": start_epoch}}
+
+        if end_iso:
+            end_epoch = int(datetime.fromisoformat(end_iso.replace('Z', '+00:00')).timestamp())
+            end_condition = {"datetime_epoch": {"$lte": end_epoch}}
+            final_filter_list.append({"$and": [start_condition, end_condition]})
+        else:
+            final_filter_list.append(start_condition)
+    # Apply default anomaly filter if requested (e.g., "analyze today's stats")
+    if apply_default_anomaly:
+        # Define anomaly criteria: (failed > 0 OR averagetimetaken > 3000)
+        final_filter_list.append({
+            "$or": [{"failed": {"$gt": 0}}, {"averagetimetaken": {"$gt": 3000.0}}]
+        })
+
+    # Category Filters
+    if args := llm_args.get("functionality"):
+        final_filter_list.append({"functionality": {"$eq": args}})
+    if args := llm_args.get("api"):
+        final_filter_list.append({"api": {"$eq": args}})
+
+    # Numerical Filters
+        # CORRECTED CODE:
+
+    if (val := llm_args.get("failed_val")) is not None and (op := llm_args.get("failed_op")):
+            # Convert the string value (e.g., "5") to an integer (5)
+        numeric_val = int(val)
+        final_filter_list.append({"failed": {op: numeric_val}})
+
+    if (val := llm_args.get("time_val")) is not None and (op := llm_args.get("time_op")):
+            # Convert the string value (e.g., "3000.0") to a float (3000.0)
+        numeric_val = float(val)
+        final_filter_list.append({"averagetimetaken": {op: numeric_val}})
+
+
+
+    # Final composition
+    if not final_filter_list:
+        return {}
+    if len(final_filter_list) == 1 and "$and" not in final_filter_list[0]:
+        return final_filter_list[0]
+
+    return {"$and": final_filter_list}
+
+
+
+pip install --upgrade pydevd-pycharm
