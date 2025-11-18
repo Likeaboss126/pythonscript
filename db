@@ -31,3 +31,38 @@ TEMPLATE """
 <|assistant|>{{ .Response }}<|end|>
 {{- end }}
 """
+
+
+extraction_prompt = f"""
+        You are a Filter Generator. Analyze the user's request and translate it into a single JSON dictionary 
+        that conforms to the following schema.
+
+        - Output ONLY the JSON object. Do not include any text or markdown fencing (```json).
+        - Use the period_type argument ONLY for relative time queries (e.g., 'yesterday', 'last 7 days').
+        - Use the following dictionary keys:
+            {{
+                "functionality": <string, e.g., 'OrderProcessing'>,
+                "failed_op": <string, one of '$gt', '$lte', etc.>,
+                "failed_val": <integer>,
+                "time_op": <string, one of '$gt', '$lte', etc.>,
+                "time_val": <float, time in milliseconds>,
+                "period_type": <string, one of 'TODAY', 'YESTERDAY', 'LAST_7_DAYS', 'LAST_30_DAYS'>
+            }}
+
+        User Request: {user_query}
+    """
+    
+    # 2. Call LLM for Structured JSON Output
+    try:
+        response = CLIENT.generate(
+            model=MODEL_NAME, 
+            prompt=extraction_prompt,
+            format='json', # CRUCIAL: Forces the model to output a JSON string
+            options={'temperature': 0.01}
+        )
+        raw_filter_json = response['response']
+
+    except ollama.RequestError as e:
+        return f"Error connecting to LLM or generating response: {e}"
+    except Exception as e:
+        return f"An unexpected error occurred during LLM call: {e}"
