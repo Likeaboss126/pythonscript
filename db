@@ -69,3 +69,9 @@ extraction_prompt = f"""
 
 
 CLIENT = Client(host=OLLAMA_HOST)
+
+
+
+- **CRITICAL RULE:** If an argument is not explicitly requested or implied by the user's query, you MUST OMIT that key from the final JSON object entirely. Do not use 'null' or 'None'.
+        - Only use the period_type argument for relative time queries (e.g., 'yesterday', 'last 7 days').
+        -
