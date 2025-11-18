@@ -66,3 +66,6 @@ extraction_prompt = f"""
         return f"Error connecting to LLM or generating response: {e}"
     except Exception as e:
         return f"An unexpected error occurred during LLM call: {e}"
+
+
+CLIENT = Client(host=OLLAMA_HOST)
