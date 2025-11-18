@@ -159,3 +159,6 @@ def _create_chroma_filter_dict(llm_args: dict, apply_default_anomaly: bool = Fal
 
 
 pip install --upgrade pydevd-pycharm
+
+
+"{'$and': [{'failed': {'$gt': 25}}, {'averagetimetaken': {'$gt': 2000.0}}]}"
