@@ -156,7 +156,35 @@ def _create_chroma_filter_dict(llm_args: dict, apply_default_anomaly: bool = Fal
 
     return {"$and": final_filter_list}
 
+def calculate_date_range(period_type: str) -> tuple[Optional[str], Optional[str]]:
+    """Calculates ISO strings for the start and end of a given relative period."""
+    today = datetime.now().date()
 
+    # 00:00:00 of the specified date
+    def get_start_of_day(date):
+        return datetime.combine(date, datetime.min.time()).isoformat()
+
+    # 23:59:59 of the specified date
+    def get_end_of_day(date):
+        return datetime.combine(date, datetime.max.time()).isoformat()
+
+    period_type = period_type.upper()
+
+    if period_type == 'TODAY':
+        # Start of today to NOW (up to the minute)
+        return get_start_of_day(today), datetime.now().isoformat()
+
+    elif period_type == 'YESTERDAY':
+        yesterday = today - timedelta(days=1)
+        return get_start_of_day(yesterday), get_end_of_day(yesterday)
+
+    elif period_type == 'LAST_7_DAYS':
+        # 7 days ago at the start of that day, up to NOW
+        start_date = today - timedelta(days=7)
+        return get_start_of_day(start_date), datetime.now().isoformat()
+
+    # Default fallback
+    return None, None
 
 pip install --upgrade pydevd-pycharm
 
