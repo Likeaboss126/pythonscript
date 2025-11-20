@@ -190,3 +190,21 @@ pip install --upgrade pydevd-pycharm
 
 
 "{'$and': [{'failed': {'$gt': 25}}, {'averagetimetaken': {'$gt': 2000.0}}]}"
+
+# if period_start := llm_args.get("period_start"):
+    #         start_epoch = int(datetime.fromisoformat(period_start.replace('Z', '+00:00')).timestamp())
+    #
+    #         # Create the start condition: datetime_epoch >= start_epoch
+    #         start_condition = {"datetime_epoch": {"$gte": start_epoch}}
+    #
+    #         if period_end := llm_args.get("period_end"):
+    #             end_epoch = int(datetime.fromisoformat(period_end.replace('Z', '+00:00')).timestamp())
+    #
+    #             # Create the end condition: datetime_epoch <= end_epoch
+    #             end_condition = {"datetime_epoch": {"$lte": end_epoch}}
+    #
+    #             # Combine both conditions using a top-level $and
+    #             final_filter_list.append({"$and": [start_condition, end_condition]})
+    #         else:
+    #             # If only start date is given, just add the start condition
+    #             final_filter_list.append(start_condition)
