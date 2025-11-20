@@ -213,3 +213,32 @@ pip install --upgrade pydevd-pycharm
 # End of the day (The start of the next day, which is the ChromaDB '$lte' boundary)
         end_date_obj = date_obj + timedelta(days=1)
         end_iso = datetime.combine(end_date_obj, datetime.min.time()).isoformat()
+
+
+            if not results:
+                final_response = "No records matched the filter criteria."
+            else:
+                # Prepare context for LLM
+                context_summary = json.dumps([
+                    {"api": r['api'], "failed": r['failed'], "time": r['averagetimetaken'], "date": r['datetime'][:10]}
+                    for r in results
+                ])
+
+                # Next turn: LLM synthesizes the narrative
+                messages.append(response.message)  # Add the tool call message
+                messages.append({"role": "tool", "content": context_summary, "name": "build_chroma_filter"})
+                # --- The crucial change is here: ---
+                synthesis_prompt = (
+                    "Based on the provided JSON context from the database tool, generate a concise analysis. "
+                    "Start with a summary. Then, **list the specific API endpoints found** along with their "
+                    "corresponding 'failed' count and 'time' (average time taken) in a clear, easy-to-read markdown table or bulleted list. "
+                    "Focus on the data, not on explaining the filter parameters."
+                )
+                messages.append({"role": "user", "content": synthesis_prompt})  # Add the new instruction
+                final_response = ollama_client.chat(
+                    model=OLLAMA_MODEL,
+                    messages=messages
+                ).message.content
+
+            print("\n--- Final RAG Response ---")
+            print(final_response)
