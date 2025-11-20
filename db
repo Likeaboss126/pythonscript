@@ -208,3 +208,8 @@ pip install --upgrade pydevd-pycharm
     #         else:
     #             # If only start date is given, just add the start condition
     #             final_filter_list.append(start_condition)
+
+
+# End of the day (The start of the next day, which is the ChromaDB '$lte' boundary)
+        end_date_obj = date_obj + timedelta(days=1)
+        end_iso = datetime.combine(end_date_obj, datetime.min.time()).isoformat()
