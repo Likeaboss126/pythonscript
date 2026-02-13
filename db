@@ -1,47 +1,94 @@
-{
-  "user_profile": {
-    "age": 35,
-    "risk_profile": "Moderate",
-    "retirement_year": 2060
-  },
-  "allocation": {
-    "equity": 0.6,
-    "debt": 0.4
-  },
-  "portfolio_assumptions": {
-    "equity_return": 11,
-    "debt_return": 6.5,
-    "portfolio_cagr": 9.5
-  },
-  "goals": [
-    {
-      "name": "Child Education",
-      "status": "On Track"
-    },
-    {
-      "name": "Vacation",
-      "status": "On Track"
-    }
-  ],
-  "retirement_projection": {
-    "monthly_investment": 45000,
-    "projection_year": 2060,
-    "goal_status": "On Track"
-  }
-}
+import requests
+import json
 
+OLLAMA_URL = "http://localhost:11434/api/generate"
+MODEL_NAME = "phi3:mini"  # 🔁 change to your model
 
+def generate_explanation(plan_json: dict) -> str:
+    """
+    Sends financial plan JSON to local Ollama model
+    and returns a simple human-readable explanation.
+    """
 
-
+    system_prompt = """
 You are a financial planning assistant.
 
 Explain the financial plan in simple, friendly language.
+
 Specifically:
-- Explain the moderate risk allocation (60% equity, 40% debt)
-- Explain how the expected portfolio return of 9.5% is derived from equity (11%) and debt (6.5%)
+- Explain the moderate risk allocation (equity vs debt)
+- Explain how the expected portfolio return (CAGR) is derived
+  from equity and debt returns using the given allocation
 - Mention whether each goal is on track
 - Summarize the retirement outlook
 
-Do not add new numbers.
-Do not change any values.
-Use only the provided data.
+IMPORTANT RULES:
+- Do NOT add new numbers
+- Do NOT change any values
+- Use ONLY the provided data
+- Do NOT show calculations or formulas
+- Keep the explanation concise and easy to understand
+"""
+
+    user_prompt = f"""
+Financial Plan Data:
+{json.dumps(plan_json, indent=2)}
+"""
+
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": system_prompt + "\n" + user_prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0,
+            "top_p": 1
+        }
+    }
+
+    try:
+        response = requests.post(OLLAMA_URL, json=payload)
+        response.raise_for_status()
+        result = response.json()
+
+        explanation_text = result.get("response", "").strip()
+        return explanation_text
+
+    except Exception as e:
+        return f"Error generating explanation: {str(e)}"
+
+
+
+plan_json = {
+    "user_profile": {
+        "age": 35,
+        "risk_profile": "Moderate",
+        "retirement_year": 2060
+    },
+    "allocation": {
+        "equity": 0.6,
+        "debt": 0.4
+    },
+    "portfolio_assumptions": {
+        "equity_return": 11,
+        "debt_return": 6.5,
+        "portfolio_cagr": 9.5
+    },
+    "goals": [
+        {
+            "name": "Child Education",
+            "status": "On Track"
+        },
+        {
+            "name": "Vacation",
+            "status": "On Track"
+        }
+    ],
+    "retirement_projection": {
+        "monthly_investment": 45000,
+        "projection_year": 2060,
+        "goal_status": "On Track"
+    }
+}
+
+text = generate_explanation(plan_json)
+print(text)
