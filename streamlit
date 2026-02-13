@@ -1,0 +1,78 @@
+def generate_yearly_projection(monthly_sip, annual_return, start_year, end_year):
+    r = annual_return / 100
+    corpus = 0
+    yearly_data = []
+
+    for year in range(start_year, end_year + 1):
+        corpus = (corpus + monthly_sip * 12) * (1 + r)
+        yearly_data.append({"year": year, "corpus": corpus})
+
+    return yearly_data
+
+
+import matplotlib.pyplot as plt
+
+def plot_projection_chart(yearly_data, goals, retirement_corpus):
+    years = [d["year"] for d in yearly_data]
+    corpus_values = [d["corpus"] for d in yearly_data]
+
+    plt.figure(figsize=(10, 5))
+
+    # 📈 Corpus growth line
+    plt.plot(years, corpus_values, label="Corpus Growth")
+
+    # 🎯 Mark goal points
+    for goal in goals:
+        goal_year = goal["target_year"]
+
+        # Find corpus value for that year
+        for d in yearly_data:
+            if d["year"] == goal_year:
+                plt.scatter(goal_year, d["corpus"])
+                plt.text(goal_year, d["corpus"], goal["name"], fontsize=9)
+                break
+
+    # 💰 Highlight retirement corpus
+    plt.scatter(years[-1], retirement_corpus)
+    plt.text(years[-1], retirement_corpus, "Retirement", fontsize=10)
+
+    plt.xlabel("Year")
+    plt.ylabel("Corpus Value (₹)")
+    plt.title("Investment Projection Over Time")
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    return plt
+
+
+
+yearly_data = generate_yearly_projection(
+    monthly_sip=45000,
+    annual_return=9.5,
+    start_year=2025,
+    end_year=2060
+)
+
+goals = [
+    {"name": "Child Education", "target_year": 2029},
+    {"name": "Vacation", "target_year": 2030}
+]
+
+retirement_corpus = yearly_data[-1]["corpus"]
+
+fig = plot_projection_chart(yearly_data, goals, retirement_corpus)
+st.pyplot(fig)
+
+
+
+
+st.subheader("Retirement Projection Summary")
+
+st.metric("Monthly Investment", "₹45,000")
+st.metric("Expected CAGR", "9.5%")
+st.metric("Expected Corpus by 2060", f"₹{retirement_corpus:,.0f}")
+
+
+
+a
