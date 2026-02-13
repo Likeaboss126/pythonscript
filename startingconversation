@@ -3,7 +3,7 @@ import requests
 import json
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "phi3:mini"  # change if needed
+MODEL_NAME = "phi3:mini"
 
 # ---------------- SESSION STATE ---------------- #
 if "user_data" not in st.session_state:
@@ -21,6 +21,9 @@ if "stage" not in st.session_state:
 if "awaiting_goal_confirmation" not in st.session_state:
     st.session_state.awaiting_goal_confirmation = False
 
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 # ---------------- AI GOAL EXTRACTION ---------------- #
 def ai_extract_goal(user_text):
     prompt = f"""
@@ -32,7 +35,6 @@ name, target_year, target_amount
 User input:
 {user_text}
 """
-
     payload = {
         "model": MODEL_NAME,
         "prompt": prompt,
@@ -48,42 +50,50 @@ User input:
     except:
         return None
 
-# ---------------- UI ---------------- #
-st.title("💼 AI Financial Advisor")
+# ---------------- HELPER TO ADD BOT MESSAGE ---------------- #
+def bot_says(text):
+    st.session_state.messages.append({"role": "assistant", "content": text})
 
-# Welcome message
+# ---------------- WELCOME MESSAGE ---------------- #
 if st.session_state.stage == "welcome":
-    st.markdown("""
-👋 **Hi! I’m your AI Financial Advisor**  
-I’ll help you create a goal-based financial plan 📊  
-
-Let’s start with a few quick details.
-""")
+    bot_says("👋 **Hi! I’m your AI Financial Advisor**\n\nI’ll help you create a goal-based financial plan 📊")
+    bot_says("🎂 What is your age?")
     st.session_state.stage = "age"
 
-user_input = st.text_input("✍️ Your response")
+# ---------------- DISPLAY CHAT ---------------- #
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(f"<span style='font-size:18px'>{msg['content']}</span>", unsafe_allow_html=True)
 
-# ---------------- LOGIC ---------------- #
+# ---------------- CHAT INPUT (ALWAYS AT BOTTOM) ---------------- #
+user_input = st.chat_input("Type your answer here...")
+
+# ---------------- HANDLE USER INPUT ---------------- #
 if user_input:
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
     # ---- AGE ---- #
     if st.session_state.stage == "age":
         st.session_state.user_data["age"] = int(user_input)
+        bot_says("💰 What is your monthly income?")
         st.session_state.stage = "income"
 
     # ---- INCOME ---- #
     elif st.session_state.stage == "income":
         st.session_state.user_data["monthly_income"] = int(user_input)
+        bot_says("🧾 What are your monthly expenses?")
         st.session_state.stage = "expenses"
 
     # ---- EXPENSES ---- #
     elif st.session_state.stage == "expenses":
         st.session_state.user_data["monthly_expenses"] = int(user_input)
+        bot_says("📊 What is your risk profile? (Conservative / Moderate / Aggressive)")
         st.session_state.stage = "risk"
 
-    # ---- RISK PROFILE ---- #
+    # ---- RISK ---- #
     elif st.session_state.stage == "risk":
         st.session_state.user_data["risk_profile"] = user_input.capitalize()
+        bot_says("🎯 Tell me your financial goal with amount and year (e.g., Child education 150000 in 2029)")
         st.session_state.stage = "goal"
 
     # ---- GOAL INPUT ---- #
@@ -92,38 +102,19 @@ if user_input:
 
         if goal:
             st.session_state.user_data["goals"].append(goal)
+            bot_says("➕ Do you want to add another goal? (yes/no)")
             st.session_state.awaiting_goal_confirmation = True
         else:
-            st.warning("⚠️ I couldn’t understand the goal. Please try again.")
+            bot_says("⚠️ I couldn’t understand the goal. Please try again.")
 
     # ---- GOAL CONFIRMATION ---- #
     elif st.session_state.awaiting_goal_confirmation:
         if user_input.lower() in ["yes", "y"]:
-            st.session_state.awaiting_goal_confirmation = False
+            bot_says("🎯 Please enter your next goal.")
             st.session_state.stage = "goal"
+            st.session_state.awaiting_goal_confirmation = False
         else:
             st.session_state.awaiting_goal_confirmation = False
             st.session_state.stage = "complete"
-
-# ---------------- PROMPTS ---------------- #
-if st.session_state.stage == "age":
-    st.write("🎂 What is your age?")
-
-elif st.session_state.stage == "income":
-    st.write("💰 What is your monthly income?")
-
-elif st.session_state.stage == "expenses":
-    st.write("🧾 What are your monthly expenses?")
-
-elif st.session_state.stage == "risk":
-    st.write("📊 What is your risk profile? (Conservative / Moderate / Aggressive)")
-
-elif st.session_state.stage == "goal":
-    st.write("🎯 Tell me your financial goal with amount and year (e.g., Child education 150000 in 2029)")
-
-elif st.session_state.awaiting_goal_confirmation:
-    st.write("➕ Do you want to add another goal? (yes/no)")
-
-elif st.session_state.stage == "complete":
-    st.success("✅ All data collected! Here is your profile:")
-    st.json(st.session_state.user_data)
+            bot_says("✅ All data collected! Here is your profile:")
+            bot_says(f"```json\n{json.dumps(st.session_state.user_data, indent=2)}\n```")
