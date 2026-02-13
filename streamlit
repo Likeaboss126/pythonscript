@@ -16,60 +16,66 @@ def plot_projection_chart(yearly_data, goals, retirement_corpus):
     years = [d["year"] for d in yearly_data]
     corpus_values = [d["corpus"] / 1e7 for d in yearly_data]  # convert to Crores
 
-    plt.figure(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(14, 7), dpi=150)  # 🔥 bigger + sharper
 
     # 📈 Growth line
-    plt.plot(
+    ax.plot(
         years,
         corpus_values,
         linewidth=3,
         label="Corpus Growth"
     )
 
-    # 🌈 Fill area under curve
-    plt.fill_between(years, corpus_values, alpha=0.1)
+    # 🌈 Fill area
+    ax.fill_between(years, corpus_values, alpha=0.1)
 
-    # 🎯 Goal markers
+    # 🎯 Goal markers (bigger)
     for goal in goals:
         goal_year = goal["target_year"]
 
         for d in yearly_data:
             if d["year"] == goal_year:
                 goal_value = d["corpus"] / 1e7
-                plt.scatter(goal_year, goal_value, s=80)
-                plt.text(
+                ax.scatter(goal_year, goal_value, s=120)
+                ax.text(
                     goal_year,
                     goal_value,
                     f" {goal['name']}",
-                    fontsize=9,
+                    fontsize=11,
+                    fontweight="bold",
                     verticalalignment="bottom"
                 )
                 break
 
-    # ⭐ Retirement marker
+    # ⭐ Retirement marker (large & clear)
     retirement_value = retirement_corpus / 1e7
-    plt.scatter(years[-1], retirement_value, s=120, marker="*")
-    plt.text(
+    ax.scatter(years[-1], retirement_value, s=250, marker="*")
+    ax.text(
         years[-1],
         retirement_value,
         " Retirement",
-        fontsize=10,
+        fontsize=12,
         fontweight="bold",
         verticalalignment="bottom"
     )
 
-    # 🧾 Labels & formatting
-    plt.xlabel("Year", fontsize=12)
-    plt.ylabel("Corpus (₹ Crores)", fontsize=12)
-    plt.title("Wealth Projection Over Time", fontsize=14, fontweight="bold")
+    # 🧾 Labels
+    ax.set_xlabel("Year", fontsize=13)
+    ax.set_ylabel("Corpus (₹ Crores)", fontsize=13)
+    ax.set_title("Wealth Projection Over Time", fontsize=15, fontweight="bold")
 
-    plt.xticks(rotation=45)
-    plt.grid(alpha=0.3)
+    # 🔧 Reduce x-axis clutter (show every 3rd year)
+    ax.set_xticks(years[::3])
+    ax.tick_params(axis='x', rotation=45, labelsize=11)
+    ax.tick_params(axis='y', labelsize=11)
 
-    plt.legend()
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=12)
+
     plt.tight_layout()
+    return fig
 
-    return plt
+st.pyplot(fig, use_container_width=True)
 
 
 
