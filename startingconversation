@@ -5,6 +5,15 @@ import json
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "phi3:mini"
 
+# ---------------- CSS FOR BIGGER CHAT TEXT ---------------- #
+st.markdown("""
+<style>
+.chat-message {
+    font-size: 18px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ---------------- SESSION STATE ---------------- #
 if "user_data" not in st.session_state:
     st.session_state.user_data = {
@@ -50,25 +59,13 @@ User input:
     except:
         return None
 
-# ---------------- HELPER TO ADD BOT MESSAGE ---------------- #
+# ---------------- HELPER ---------------- #
 def bot_says(text):
     st.session_state.messages.append({"role": "assistant", "content": text})
 
-# ---------------- WELCOME MESSAGE ---------------- #
-if st.session_state.stage == "welcome":
-    bot_says("👋 **Hi! I’m your AI Financial Advisor**\n\nI’ll help you create a goal-based financial plan 📊")
-    bot_says("🎂 What is your age?")
-    st.session_state.stage = "age"
-
-# ---------------- DISPLAY CHAT ---------------- #
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(f"<span style='font-size:18px'>{msg['content']}</span>", unsafe_allow_html=True)
-
-# ---------------- CHAT INPUT (ALWAYS AT BOTTOM) ---------------- #
+# ---------------- HANDLE USER INPUT FIRST ---------------- #
 user_input = st.chat_input("Type your answer here...")
 
-# ---------------- HANDLE USER INPUT ---------------- #
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
@@ -118,3 +115,15 @@ if user_input:
             st.session_state.stage = "complete"
             bot_says("✅ All data collected! Here is your profile:")
             bot_says(f"```json\n{json.dumps(st.session_state.user_data, indent=2)}\n```")
+
+# ---------------- WELCOME MESSAGE ---------------- #
+if st.session_state.stage == "welcome":
+    bot_says("👋 **Hi! I’m your AI Financial Advisor**")
+    bot_says("I’ll help you create a goal-based financial plan 📊")
+    bot_says("🎂 What is your age?")
+    st.session_state.stage = "age"
+
+# ---------------- DISPLAY CHAT ---------------- #
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(f"<div class='chat-message'>{msg['content']}</div>", unsafe_allow_html=True)
