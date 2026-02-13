@@ -14,35 +14,61 @@ import matplotlib.pyplot as plt
 
 def plot_projection_chart(yearly_data, goals, retirement_corpus):
     years = [d["year"] for d in yearly_data]
-    corpus_values = [d["corpus"] for d in yearly_data]
+    corpus_values = [d["corpus"] / 1e7 for d in yearly_data]  # convert to Crores
 
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(12, 6))
 
-    # 📈 Corpus growth line
-    plt.plot(years, corpus_values, label="Corpus Growth")
+    # 📈 Growth line
+    plt.plot(
+        years,
+        corpus_values,
+        linewidth=3,
+        label="Corpus Growth"
+    )
 
-    # 🎯 Mark goal points
+    # 🌈 Fill area under curve
+    plt.fill_between(years, corpus_values, alpha=0.1)
+
+    # 🎯 Goal markers
     for goal in goals:
         goal_year = goal["target_year"]
 
-        # Find corpus value for that year
         for d in yearly_data:
             if d["year"] == goal_year:
-                plt.scatter(goal_year, d["corpus"])
-                plt.text(goal_year, d["corpus"], goal["name"], fontsize=9)
+                goal_value = d["corpus"] / 1e7
+                plt.scatter(goal_year, goal_value, s=80)
+                plt.text(
+                    goal_year,
+                    goal_value,
+                    f" {goal['name']}",
+                    fontsize=9,
+                    verticalalignment="bottom"
+                )
                 break
 
-    # 💰 Highlight retirement corpus
-    plt.scatter(years[-1], retirement_corpus)
-    plt.text(years[-1], retirement_corpus, "Retirement", fontsize=10)
+    # ⭐ Retirement marker
+    retirement_value = retirement_corpus / 1e7
+    plt.scatter(years[-1], retirement_value, s=120, marker="*")
+    plt.text(
+        years[-1],
+        retirement_value,
+        " Retirement",
+        fontsize=10,
+        fontweight="bold",
+        verticalalignment="bottom"
+    )
 
-    plt.xlabel("Year")
-    plt.ylabel("Corpus Value (₹)")
-    plt.title("Investment Projection Over Time")
+    # 🧾 Labels & formatting
+    plt.xlabel("Year", fontsize=12)
+    plt.ylabel("Corpus (₹ Crores)", fontsize=12)
+    plt.title("Wealth Projection Over Time", fontsize=14, fontweight="bold")
+
+    plt.xticks(rotation=45)
+    plt.grid(alpha=0.3)
+
     plt.legend()
-    plt.grid(True)
-
     plt.tight_layout()
+
     return plt
 
 
@@ -60,6 +86,10 @@ goals = [
 ]
 
 retirement_corpus = yearly_data[-1]["corpus"]
+
+col1.metric("Monthly Investment", "₹45,000")
+col2.metric("Expected CAGR", "9.5%")
+col3.metric("Retirement Corpus", f"₹{retirement_corpus/1e7:.2f} Cr")
 
 fig = plot_projection_chart(yearly_data, goals, retirement_corpus)
 st.pyplot(fig)
