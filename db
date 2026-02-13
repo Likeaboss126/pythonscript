@@ -1,244 +1,47 @@
-# Modelfile
-# 1. Source: Points to your single, merged GGUF file
-FROM ./merged_phi3_4k.gguf
-
-# 2. PARAMETERS (Essential)
-PARAMETER num_ctx 4096
-PARAMETER stop <|end|>
-PARAMETER stop <|user|>
-PARAMETER stop <|assistant|>
-PARAMETER stop <|tool_response|>
-
-# 3. TEMPLATE (CRITICAL FIX for Instruct/Tooling)
-# This forces the template that Phi-3 was trained on for instruction and tool use.
-TEMPLATE """
-{{- if .System }}<|system|>{{ .System }}<|end|>{{- endif -}}
-{{- if .ToolCalls -}}
-  <|tool_calls|>
-  {{- range .ToolCalls -}}
-    {{- if .ID }}
-      <|tool_call_id|>{{ .ID }}<|end|>
-    {{- else }}
-      <|tool_call|>
-      {"name":"{{ .Name }}", "arguments":{{ .Arguments }}}
-      <|end|>
-    {{- end -}}
-  {{- end -}}
-  <|end|>
-{{- end -}}
-<|user|>{{ .Prompt }}<|end|>
-{{- if .Response }}
-<|assistant|>{{ .Response }}<|end|>
-{{- end }}
-"""
-
-
-extraction_prompt = f"""
-        You are a Filter Generator. Analyze the user's request and translate it into a single JSON dictionary 
-        that conforms to the following schema.
-
-        - Output ONLY the JSON object. Do not include any text or markdown fencing (```json).
-        - Use the period_type argument ONLY for relative time queries (e.g., 'yesterday', 'last 7 days').
-        - Use the following dictionary keys:
-            {{
-                "functionality": <string, e.g., 'OrderProcessing'>,
-                "failed_op": <string, one of '$gt', '$lte', etc.>,
-                "failed_val": <integer>,
-                "time_op": <string, one of '$gt', '$lte', etc.>,
-                "time_val": <float, time in milliseconds>,
-                "period_type": <string, one of 'TODAY', 'YESTERDAY', 'LAST_7_DAYS', 'LAST_30_DAYS'>
-            }}
-
-        User Request: {user_query}
-    """
-    
-    # 2. Call LLM for Structured JSON Output
-    try:
-        response = CLIENT.generate(
-            model=MODEL_NAME, 
-            prompt=extraction_prompt,
-            format='json', # CRUCIAL: Forces the model to output a JSON string
-            options={'temperature': 0.01}
-        )
-        raw_filter_json = response['response']
-
-    except ollama.RequestError as e:
-        return f"Error connecting to LLM or generating response: {e}"
-    except Exception as e:
-        return f"An unexpected error occurred during LLM call: {e}"
-
-
-CLIENT = Client(host=OLLAMA_HOST)
-
-
-
-- **CRITICAL RULE:** If an argument is not explicitly requested or implied by the user's query, you MUST OMIT that key from the final JSON object entirely. Do not use 'null' or 'None'.
-        - Only use the period_type argument for relative time queries (e.g., 'yesterday', 'last 7 days').
-        -
-
-
-
-def execute_chroma_query(
-        semantic_query: str,
-        chroma_filter: Dict[str, Any],
-        n_results: int = 10
-) -> List[Dict[str, Any]]:
-    """Executes the ChromaDB query and returns a list of metadata dictionaries."""
-
-    client = chromadb.PersistentClient(path=DB_PATH)
-    collection = client.get_collection(name=COLLECTION_NAME)
-
-    search_results = collection.query(
-        # query_texts=[semantic_query],
-        query_texts=['api'],
-        n_results=n_results,
-        where=chroma_filter,
-        include=['metadatas']
-    )
-
-    return search_results['metadatas'][0] if search_results['metadatas'] else []
+{
+  "user_profile": {
+    "age": 35,
+    "risk_profile": "Moderate",
+    "retirement_year": 2060
+  },
+  "allocation": {
+    "equity": 0.6,
+    "debt": 0.4
+  },
+  "portfolio_assumptions": {
+    "equity_return": 11,
+    "debt_return": 6.5,
+    "portfolio_cagr": 9.5
+  },
+  "goals": [
+    {
+      "name": "Child Education",
+      "status": "On Track"
+    },
+    {
+      "name": "Vacation",
+      "status": "On Track"
+    }
+  ],
+  "retirement_projection": {
+    "monthly_investment": 45000,
+    "projection_year": 2060,
+    "goal_status": "On Track"
+  }
+}
 
 
 
 
-def _create_chroma_filter_dict(llm_args: dict, apply_default_anomaly: bool = False) -> Dict[str, Any]:
-    """Converts LLM arguments to the nested ChromaDB filter structure."""
+You are a financial planning assistant.
 
-    final_filter_list = []
-    start_iso, end_iso = None, None
-    if period_type := llm_args.get("period_type"):
-        start_iso, end_iso = calculate_date_range(period_type)
+Explain the financial plan in simple, friendly language.
+Specifically:
+- Explain the moderate risk allocation (60% equity, 40% debt)
+- Explain how the expected portfolio return of 9.5% is derived from equity (11%) and debt (6.5%)
+- Mention whether each goal is on track
+- Summarize the retirement outlook
 
-    if start_iso:
-        # Convert the calculated ISO string to epoch
-        start_epoch = int(datetime.fromisoformat(start_iso.replace('Z', '+00:00')).timestamp())
-        start_condition = {"datetime_epoch": {"$gte": start_epoch}}
-
-        if end_iso:
-            end_epoch = int(datetime.fromisoformat(end_iso.replace('Z', '+00:00')).timestamp())
-            end_condition = {"datetime_epoch": {"$lte": end_epoch}}
-            final_filter_list.append({"$and": [start_condition, end_condition]})
-        else:
-            final_filter_list.append(start_condition)
-    # Apply default anomaly filter if requested (e.g., "analyze today's stats")
-    if apply_default_anomaly:
-        # Define anomaly criteria: (failed > 0 OR averagetimetaken > 3000)
-        final_filter_list.append({
-            "$or": [{"failed": {"$gt": 0}}, {"averagetimetaken": {"$gt": 3000.0}}]
-        })
-
-    # Category Filters
-    if args := llm_args.get("functionality"):
-        final_filter_list.append({"functionality": {"$eq": args}})
-    if args := llm_args.get("api"):
-        final_filter_list.append({"api": {"$eq": args}})
-
-    # Numerical Filters
-        # CORRECTED CODE:
-
-    if (val := llm_args.get("failed_val")) is not None and (op := llm_args.get("failed_op")):
-            # Convert the string value (e.g., "5") to an integer (5)
-        numeric_val = int(val)
-        final_filter_list.append({"failed": {op: numeric_val}})
-
-    if (val := llm_args.get("time_val")) is not None and (op := llm_args.get("time_op")):
-            # Convert the string value (e.g., "3000.0") to a float (3000.0)
-        numeric_val = float(val)
-        final_filter_list.append({"averagetimetaken": {op: numeric_val}})
-
-
-
-    # Final composition
-    if not final_filter_list:
-        return {}
-    if len(final_filter_list) == 1 and "$and" not in final_filter_list[0]:
-        return final_filter_list[0]
-
-    return {"$and": final_filter_list}
-
-def calculate_date_range(period_type: str) -> tuple[Optional[str], Optional[str]]:
-    """Calculates ISO strings for the start and end of a given relative period."""
-    today = datetime.now().date()
-
-    # 00:00:00 of the specified date
-    def get_start_of_day(date):
-        return datetime.combine(date, datetime.min.time()).isoformat()
-
-    # 23:59:59 of the specified date
-    def get_end_of_day(date):
-        return datetime.combine(date, datetime.max.time()).isoformat()
-
-    period_type = period_type.upper()
-
-    if period_type == 'TODAY':
-        # Start of today to NOW (up to the minute)
-        return get_start_of_day(today), datetime.now().isoformat()
-
-    elif period_type == 'YESTERDAY':
-        yesterday = today - timedelta(days=1)
-        return get_start_of_day(yesterday), get_end_of_day(yesterday)
-
-    elif period_type == 'LAST_7_DAYS':
-        # 7 days ago at the start of that day, up to NOW
-        start_date = today - timedelta(days=7)
-        return get_start_of_day(start_date), datetime.now().isoformat()
-
-    # Default fallback
-    return None, None
-
-pip install --upgrade pydevd-pycharm
-
-
-"{'$and': [{'failed': {'$gt': 25}}, {'averagetimetaken': {'$gt': 2000.0}}]}"
-
-# if period_start := llm_args.get("period_start"):
-    #         start_epoch = int(datetime.fromisoformat(period_start.replace('Z', '+00:00')).timestamp())
-    #
-    #         # Create the start condition: datetime_epoch >= start_epoch
-    #         start_condition = {"datetime_epoch": {"$gte": start_epoch}}
-    #
-    #         if period_end := llm_args.get("period_end"):
-    #             end_epoch = int(datetime.fromisoformat(period_end.replace('Z', '+00:00')).timestamp())
-    #
-    #             # Create the end condition: datetime_epoch <= end_epoch
-    #             end_condition = {"datetime_epoch": {"$lte": end_epoch}}
-    #
-    #             # Combine both conditions using a top-level $and
-    #             final_filter_list.append({"$and": [start_condition, end_condition]})
-    #         else:
-    #             # If only start date is given, just add the start condition
-    #             final_filter_list.append(start_condition)
-
-
-# End of the day (The start of the next day, which is the ChromaDB '$lte' boundary)
-        end_date_obj = date_obj + timedelta(days=1)
-        end_iso = datetime.combine(end_date_obj, datetime.min.time()).isoformat()
-
-
-            if not results:
-                final_response = "No records matched the filter criteria."
-            else:
-                # Prepare context for LLM
-                context_summary = json.dumps([
-                    {"api": r['api'], "failed": r['failed'], "time": r['averagetimetaken'], "date": r['datetime'][:10]}
-                    for r in results
-                ])
-
-                # Next turn: LLM synthesizes the narrative
-                messages.append(response.message)  # Add the tool call message
-                messages.append({"role": "tool", "content": context_summary, "name": "build_chroma_filter"})
-                # --- The crucial change is here: ---
-                synthesis_prompt = (
-                    "Based on the provided JSON context from the database tool, generate a concise analysis. "
-                    "Start with a summary. Then, **list the specific API endpoints found** along with their "
-                    "corresponding 'failed' count and 'time' (average time taken) in a clear, easy-to-read markdown table or bulleted list. "
-                    "Focus on the data, not on explaining the filter parameters."
-                )
-                messages.append({"role": "user", "content": synthesis_prompt})  # Add the new instruction
-                final_response = ollama_client.chat(
-                    model=OLLAMA_MODEL,
-                    messages=messages
-                ).message.content
-
-            print("\n--- Final RAG Response ---")
-            print(final_response)
+Do not add new numbers.
+Do not change any values.
+Use only the provided data.
