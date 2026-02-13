@@ -20,6 +20,7 @@ Specifically:
 - Explain how the expected portfolio return (CAGR) is derived
   from equity and debt returns using the given allocation
 - Mention whether each goal is on track
+-Mention the expected retirement corpus in simple terms.
 - Summarize the retirement outlook
 
 IMPORTANT RULES:
@@ -86,6 +87,7 @@ plan_json = {
     "retirement_projection": {
         "monthly_investment": 45000,
         "projection_year": 2060,
+expected_corpus": 42000000,
         "goal_status": "On Track"
     }
 }
