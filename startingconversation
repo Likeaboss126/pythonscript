@@ -148,3 +148,40 @@ if st.session_state.stage == "welcome":
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(f"<div class='chat-message'>{msg['content']}</div>", unsafe_allow_html=True)
+
+
+
+
+import re
+
+def fallback_goal_parser(text):
+    year_match = re.search(r"(20\d{2})", text)
+    amount_match = re.search(r"(\d+)", text)
+
+    if year_match and amount_match:
+        year = int(year_match.group(1))
+        amount = int(amount_match.group(1))
+
+        name = re.sub(r"\d+.*", "", text).strip()
+
+        return {
+            "name": name if name else "Goal",
+            "target_year": year,
+            "target_amount": amount
+        }
+
+    return None
+
+
+
+goal = ai_extract_goal(user_input)
+
+if not goal:
+    goal = fallback_goal_parser(user_input)
+
+if goal:
+    st.session_state.user_data["goals"].append(goal)
+    bot_says("➕ Do you want to add another goal? (yes/no)")
+    st.session_state.awaiting_goal_confirmation = True
+else:
+    bot_says("⚠️ Please enter goal like: Child education 150000 in 2029")
