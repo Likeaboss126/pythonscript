@@ -36,10 +36,31 @@ if "messages" not in st.session_state:
 # ---------------- AI GOAL EXTRACTION ---------------- #
 def ai_extract_goal(user_text):
     prompt = f"""
-Extract financial goal details.
+You are an information extraction system.
 
-Return ONLY valid JSON with:
-name, target_year, target_amount
+Extract a financial goal from the user input.
+
+Return ONLY valid JSON in this exact format:
+{{
+  "name": "<goal name>",
+  "target_year": <year>,
+  "target_amount": <number>
+}}
+
+Rules:
+- target_year must be a 4 digit year
+- target_amount must be a number without commas
+- Do not include any text outside JSON
+
+Examples:
+
+Input: Child education 230000 in 2030
+Output:
+{{"name":"Child education","target_year":2030,"target_amount":230000}}
+
+Input: Vacation 3 lakh in 2028
+Output:
+{{"name":"Vacation","target_year":2028,"target_amount":300000}}
 
 User input:
 {user_text}
