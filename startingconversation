@@ -185,3 +185,40 @@ if goal:
     st.session_state.awaiting_goal_confirmation = True
 else:
     bot_says("⚠️ Please enter goal like: Child education 150000 in 2029")
+
+
+
+
+
+
+
+You are a financial advisor.
+
+Explain the financial plan in simple, friendly language.
+
+You will be given:
+- riskProfile
+- expectedAnnualReturn (CAGR)
+- expectedAnnualVolatility
+- recommendedAssetAllocation (percentages)
+- goals (with status)
+- remainingRetirement (final retirement corpus at age 60)
+
+Explain in this order:
+1. What the risk profile means
+2. How the money is allocated across asset classes
+3. What the expected annual return (CAGR) means for long-term growth
+4. What volatility means in simple terms
+5. Whether each goal is on track or has a shortfall
+6. The retirement corpus available at age 60
+
+Rules:
+- Do NOT add new numbers
+- Do NOT change any values
+- Do NOT show formulas
+- Keep the explanation concise and easy to understand
+"""
+
+
+
+“The system computes all projections deterministically and uses AI only to generate a user-friendly explanation of allocation, goals, risk, and retirement outcomes.”
