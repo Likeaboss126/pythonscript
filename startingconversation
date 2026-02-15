@@ -296,3 +296,23 @@ if st.session_state.get("loading", False):
     st.session_state.stage = "done"
 
     st.rerun()
+
+
+
+bot_says("📦 Here is your collected profile:")
+bot_says(json.dumps(st.session_state.user_data, indent=2))
+
+bot_says("📊 Generating your personalised financial plan...")
+
+st.session_state.stage = "ready_for_analysis"
+st.rerun()
+
+
+if st.session_state.stage == "ready_for_analysis":
+
+    st.session_state.loading = True
+    st.session_state.stage = "analysing"
+    st.rerun()
+
+
+
