@@ -222,3 +222,50 @@ Rules:
 
 
 “The system computes all projections deterministically and uses AI only to generate a user-friendly explanation of allocation, goals, risk, and retirement outcomes.”
+
+
+
+
+import time
+
+if st.button("📊 Generate Financial Plan"):
+
+    loading_placeholder = st.empty()
+
+    with loading_placeholder.chat_message("assistant"):
+
+        status_text = st.empty()
+        progress = st.progress(0)
+
+        # 🔹 Stage animation BEFORE LLM call
+        status_text.markdown("🤖 Analysing your finances...")
+        progress.progress(20)
+        time.sleep(0.3)
+
+        status_text.markdown("📊 Evaluating asset allocation...")
+        progress.progress(40)
+        time.sleep(0.3)
+
+        status_text.markdown("🎯 Checking goals & retirement...")
+        progress.progress(60)
+        time.sleep(0.3)
+
+        # 🔹 LLM thinking phase
+        status_text.markdown("🧠 AI is preparing your personalised plan...")
+        progress.progress(75)
+
+        # 🔥 Actual blocking LLM call
+        explanation = generate_full_plan_explanation(plan_json)
+
+        # 🔹 Final state
+        progress.progress(100)
+        status_text.markdown("✅ Plan ready!")
+
+    loading_placeholder.empty()
+
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": explanation
+    })
+
+    st.rerun()
