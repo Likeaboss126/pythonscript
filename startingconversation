@@ -323,3 +323,48 @@ if time.time() - st.session_state.analysis_start_time < 0.5:
 
 
 st.session_state.analysis_start_time = time.time()
+
+
+
+
+
+st.markdown("### 🎯 Add Your Financial Goals")
+
+goal_name = st.text_input("Goal Name", key="goal_name")
+goal_year = st.number_input("Target Year", min_value=2025, max_value=2100, step=1, key="goal_year")
+goal_amount = st.number_input("Target Amount (₹)", min_value=0, step=1000, key="goal_amount")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("➕ Add Goal"):
+        if goal_name and goal_year and goal_amount:
+            st.session_state.user_data["goals"].append({
+                "name": goal_name,
+                "target_year": int(goal_year),
+                "target_amount": int(goal_amount)
+            })
+            st.success("Goal added ✅")
+
+with col2:
+    if st.button("✅ Done Adding Goals"):
+        if len(st.session_state.user_data["goals"]) > 0:
+            st.session_state.stage = "complete"
+            st.rerun()
+        else:
+            st.warning("Please add at least one goal.")
+
+
+
+
+if st.session_state.user_data["goals"]:
+    st.markdown("### 📋 Added Goals")
+
+    for i, g in enumerate(st.session_state.user_data["goals"]):
+        col1, col2 = st.columns([5,1])
+
+        col1.write(f"🎯 {g['name']} — ₹{g['target_amount']} in {g['target_year']}")
+
+        if col2.button("❌", key=f"remove_goal_{i}"):
+            st.session_state.user_data["goals"].pop(i)
+            st.rerun()
