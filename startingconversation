@@ -316,3 +316,10 @@ if st.session_state.stage == "ready_for_analysis":
 
 
 
+
+
+if time.time() - st.session_state.analysis_start_time < 0.5:
+        st.stop()
+
+
+st.session_state.analysis_start_time = time.time()
