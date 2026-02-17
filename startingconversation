@@ -368,3 +368,22 @@ if st.session_state.user_data["goals"]:
         if col2.button("❌", key=f"remove_goal_{i}"):
             st.session_state.user_data["goals"].pop(i)
             st.rerun()
+
+
+
+
+st.markdown("## 🔮 What-If Scenarios")
+
+col1, col2, col3, col4 = st.columns(4)
+
+if col1.button("📈 Salary +20%"):
+    st.session_state.what_if = "salary_20"
+
+if col2.button("💰 SIP +10%"):
+    st.session_state.what_if = "sip_10"
+
+if col3.button("⏳ Retire 5 Years Later"):
+    st.session_state.what_if = "retire_late"
+
+if col4.button("📈 Salary grows 5% yearly"):
+    st.session_state.what_if = "salary_growth_5"
