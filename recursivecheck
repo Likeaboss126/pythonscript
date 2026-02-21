@@ -44,3 +44,56 @@ def verify_and_print_pages(page_id, level=0):
 print(f"🚀 Starting verification crawl for Parent ID: {PARENT_PAGE_ID}...")
 verify_and_print_pages(PARENT_PAGE_ID)
 print("\n✅ Verification Complete.")
+
+
+
+
+from atlassian import Confluence
+import urllib3
+import time # <--- New import for the delay
+
+# 1. SSL & LOGGING SETUP
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+BASE_URL = "https://confluence/confluence" 
+TOKEN = "your_personal_access_token_here" 
+PARENT_PAGE_ID = "123456789"
+
+# 2. CONFIGURE CONFLUENCE WITH RETRY LOGIC
+confluence = Confluence(
+    url=BASE_URL, 
+    token=TOKEN, 
+    verify_ssl=False,
+    backoff_and_retry=True # <--- Tells the API to handle 429s automatically
+)
+
+def verify_and_print_pages(page_id, level=0):
+    """Recursively fetches and prints page details with a safety delay."""
+    try:
+        # Fetch content
+        page = confluence.get_page_by_id(page_id, expand='body.storage')
+        title = page.get('title')
+        web_url = f"{BASE_URL}/pages/viewpage.action?pageId={page_id}"
+        raw_content = page.get('body', {}).get('storage', {}).get('value', 'EMPTY')
+        
+        indent = "  " * level
+        print(f"\n{indent}📄 TITLE: {title}")
+        print(f"{indent}🔗 URL:   {web_url}")
+        print(f"{indent}📝 CONTENT PREVIEW: {raw_content[:100].strip()}...")
+        print(f"{indent}{'-' * 40}")
+
+        # --- THE FIX: SAFETY DELAYS ---
+        time.sleep(1) # Wait 1 second before asking for children
+        
+        children = confluence.get_page_child_by_type(page_id, type='page')
+        
+        for child in children:
+            time.sleep(0.5) # Wait half a second before diving into the next child
+            verify_and_print_pages(child['id'], level + 1)
+
+    except Exception as e:
+        print(f"❌ Error on page {page_id}: {e}")
+
+print(f"🚀 Starting polite verification crawl for Parent ID: {PARENT_PAGE_ID}...")
+verify_and_print_pages(PARENT_PAGE_ID)
+print("\n✅ Verification Complete.")
