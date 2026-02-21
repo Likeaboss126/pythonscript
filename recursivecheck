@@ -1,0 +1,45 @@
+from atlassian import Confluence
+import json
+
+# --- 1. CONFIGURATION ---
+# Use the same base URL you see in your browser (up to /confluence)
+BASE_URL = "https://confluence/confluence" 
+# Use your Personal Access Token (PAT)
+TOKEN = "your_personal_access_token_here" 
+PARENT_PAGE_ID = "123456789"
+
+# Initialize connection
+confluence = Confluence(url=BASE_URL, token=TOKEN)
+
+def verify_and_print_pages(page_id, level=0):
+    """Recursively fetches and prints page details."""
+    try:
+        # 2. FETCH PAGE CONTENT
+        # We expand 'body.storage' to see the actual text data
+        page = confluence.get_page_by_id(page_id, expand='body.storage')
+        
+        title = page.get('title')
+        # Construct the direct URL for Server/DC
+        web_url = f"{BASE_URL}/pages/viewpage.action?pageId={page_id}"
+        
+        # Get the storage content (XHTML)
+        raw_content = page.get('body', {}).get('storage', {}).get('value', 'EMPTY')
+        
+        # 3. DISPLAY DATA
+        indent = "  " * level
+        print(f"\n{indent}📄 TITLE: {title}")
+        print(f"{indent}🔗 URL:   {web_url}")
+        print(f"{indent}📝 CONTENT PREVIEW: {raw_content[:150].strip()}...")
+        print(f"{indent}{'-' * 40}")
+
+        # 4. RECURSIVE STEP: Find children
+        children = confluence.get_page_child_by_type(page_id, type='page')
+        for child in children:
+            verify_and_print_pages(child['id'], level + 1)
+
+    except Exception as e:
+        print(f"❌ Error fetching page {page_id}: {e}")
+
+print(f"🚀 Starting verification crawl for Parent ID: {PARENT_PAGE_ID}...")
+verify_and_print_pages(PARENT_PAGE_ID)
+print("\n✅ Verification Complete.")
