@@ -1,6 +1,7 @@
 from atlassian import Confluence
 import json
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # --- 1. CONFIGURATION ---
 # Use the same base URL you see in your browser (up to /confluence)
 BASE_URL = "https://confluence/confluence" 
