@@ -1,69 +1,97 @@
 import requests
 import time
-from requests.auth import HTTPBasicAuth
+import urllib3
+
+# Disable SSL warnings (since verify=False)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE_URL = "https://<domain>.atlassian.net/wiki"
-EMAIL = "your-email@domain.com"
-API_TOKEN = "your_api_token"
+BEARER_TOKEN = "YOUR_BEARER_TOKEN"
 
-auth = HTTPBasicAuth(EMAIL, API_TOKEN)
 headers = {
-    "Accept": "application/json"
+    "Accept": "application/json",
+    "Authorization": f"Bearer {BEARER_TOKEN}"
 }
 
-# ---- rate limit safe request ----
+# ---------- Safe GET with rate limit + JSON check ----------
 def safe_get(url, params=None):
     while True:
-        response = requests.get(url, headers=headers, auth=auth, params=params)
+        response = requests.get(
+            url,
+            headers=headers,
+            params=params,
+            verify=False
+        )
+
         if response.status_code == 429:
             retry_after = int(response.headers.get("Retry-After", "5"))
-            print(f"Rate limited. Sleeping {retry_after} sec...")
+            print(f"⏳ Rate limited. Sleeping {retry_after} sec...")
             time.sleep(retry_after)
-        else:
-            response.raise_for_status()
-            return response.json()
+            continue
 
-# ---- get page by title ----
+        content_type = response.headers.get("Content-Type", "")
+        if "application/json" not in content_type:
+            print("❌ Non-JSON response received:")
+            print(response.text[:500])
+            raise Exception("Expected JSON but got HTML/other")
+
+        return response.json()
+
+# ---------- Get page ID by space + title ----------
 def get_page_by_title(space_key, title):
     url = f"{BASE_URL}/rest/api/content"
     params = {
         "spaceKey": space_key,
         "title": title,
-        "expand": "version"
+        "limit": 1
     }
+
     data = safe_get(url, params)
+
     if data["size"] == 0:
-        raise Exception("Page not found")
+        raise Exception(f"Page '{title}' not found in space '{space_key}'")
+
     return data["results"][0]["id"]
 
-# ---- get page body ----
+# ---------- Get page body (heavy call) ----------
 def get_page_body(page_id):
     url = f"{BASE_URL}/rest/api/content/{page_id}"
     params = {
         "expand": "body.storage"
     }
-    data = safe_get(url, params)
-    return data["title"], data["body"]["storage"]["value"]
 
-# ---- get child pages ----
+    data = safe_get(url, params)
+
+    title = data["title"]
+    body = data["body"]["storage"]["value"]
+
+    return title, body
+
+# ---------- Get child pages (paginated) ----------
 def get_child_pages(page_id):
     url = f"{BASE_URL}/rest/api/content/{page_id}/child/page"
+
     children = []
     start = 0
+    limit = 25
 
     while True:
-        params = {"limit": 25, "start": start}
+        params = {
+            "start": start,
+            "limit": limit
+        }
+
         data = safe_get(url, params)
         children.extend(data["results"])
 
-        if data["_links"].get("next"):
-            start += 25
-        else:
+        if len(data["results"]) < limit:
             break
+
+        start += limit
 
     return children
 
-# ---- recursive traversal ----
+# ---------- Recursive traversal ----------
 def traverse_page(page_id, depth=0):
     title, body = get_page_body(page_id)
 
@@ -72,17 +100,22 @@ def traverse_page(page_id, depth=0):
     # Optional: process body here
     # print(body[:200])
 
-    time.sleep(2)  # prevent 429 (important)
+    time.sleep(2)  # Prevent rate limit (important)
 
     children = get_child_pages(page_id)
 
     for child in children:
         traverse_page(child["id"], depth + 1)
 
-# ---- main ----
+# ---------- MAIN ----------
 if __name__ == "__main__":
     SPACE_KEY = "ABC"
     PAGE_TITLE = "MyPageTitle"
 
+    print("🔍 Finding root page...")
     root_page_id = get_page_by_title(SPACE_KEY, PAGE_TITLE)
+
+    print("🌳 Traversing page tree...\n")
     traverse_page(root_page_id)
+
+    print("\n✅ Done.")
