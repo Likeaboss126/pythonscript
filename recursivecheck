@@ -67,33 +67,50 @@ confluence = Confluence(
     backoff_and_retry=True # <--- Tells the API to handle 429s automatically
 )
 
-def verify_and_print_pages(page_id, level=0):
-    """Recursively fetches and prints page details with a safety delay."""
-    try:
-        # Fetch content
-        page = confluence.get_page_by_id(page_id, expand='body.storage')
-        title = page.get('title')
-        web_url = f"{BASE_URL}/pages/viewpage.action?pageId={page_id}"
-        raw_content = page.get('body', {}).get('storage', {}).get('value', 'EMPTY')
-        
-        indent = "  " * level
-        print(f"\n{indent}📄 TITLE: {title}")
-        print(f"{indent}🔗 URL:   {web_url}")
-        print(f"{indent}📝 CONTENT PREVIEW: {raw_content[:100].strip()}...")
-        print(f"{indent}{'-' * 40}")
+from atlassian import Confluence
+import urllib3
+import time
 
-        # --- THE FIX: SAFETY DELAYS ---
-        time.sleep(1) # Wait 1 second before asking for children
+# 1. SETUP
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+BASE_URL = "https://confluence/confluence" 
+TOKEN = "your_token"
+SPACE_KEY = "abcd" 
+START_PAGE_TITLE = "somepage"
+
+# Initialize
+confluence = Confluence(url=BASE_URL, token=TOKEN, verify_ssl=False)
+
+def recursive_search_by_title(space, title, level=0):
+    indent = "  " * level
+    try:
+        # 2. FETCH CONTENT USING YOUR WORKING METHOD
+        # The library's get_page_by_title uses the exact URL params you found
+        page = confluence.get_page_by_title(space=space, title=title, expand='body.storage')
         
+        if not page:
+            print(f"{indent}⚠️ Could not find page: {title}")
+            return
+
+        page_id = page.get('id')
+        content = page.get('body', {}).get('storage', {}).get('value', '')
+        
+        print(f"{indent}📄 FOUND: {title} (ID: {page_id})")
+        print(f"{indent}📝 CONTENT SIZE: {len(content)} chars")
+
+        # 3. FIND CHILDREN BY ID
+        # Once we have the ID from the title, we find its children
         children = confluence.get_page_child_by_type(page_id, type='page')
         
         for child in children:
-            time.sleep(0.5) # Wait half a second before diving into the next child
-            verify_and_print_pages(child['id'], level + 1)
+            child_title = child.get('title')
+            time.sleep(0.5) # Anti-429 delay
+            # Dive into the child using its title
+            recursive_search_by_title(space, child_title, level + 1)
 
     except Exception as e:
-        print(f"❌ Error on page {page_id}: {e}")
+        print(f"{indent}❌ Error on '{title}': {e}")
 
-print(f"🚀 Starting polite verification crawl for Parent ID: {PARENT_PAGE_ID}...")
-verify_and_print_pages(PARENT_PAGE_ID)
-print("\n✅ Verification Complete.")
+print(f"🚀 Starting crawl in Space: {SPACE_KEY} starting at: {START_PAGE_TITLE}")
+recursive_search_by_title(SPACE_KEY, START_PAGE_TITLE)
