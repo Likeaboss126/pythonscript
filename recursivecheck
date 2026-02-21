@@ -1,116 +1,48 @@
-from atlassian import Confluence
-import json
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# --- 1. CONFIGURATION ---
-# Use the same base URL you see in your browser (up to /confluence)
-BASE_URL = "https://confluence/confluence" 
-# Use your Personal Access Token (PAT)
-TOKEN = "your_personal_access_token_here" 
-PARENT_PAGE_ID = "123456789"
-
-# Initialize connection
-confluence = Confluence(url=BASE_URL, token=TOKEN)
-
-def verify_and_print_pages(page_id, level=0):
-    """Recursively fetches and prints page details."""
-    try:
-        # 2. FETCH PAGE CONTENT
-        # We expand 'body.storage' to see the actual text data
-        page = confluence.get_page_by_id(page_id, expand='body.storage')
-        
-        title = page.get('title')
-        # Construct the direct URL for Server/DC
-        web_url = f"{BASE_URL}/pages/viewpage.action?pageId={page_id}"
-        
-        # Get the storage content (XHTML)
-        raw_content = page.get('body', {}).get('storage', {}).get('value', 'EMPTY')
-        
-        # 3. DISPLAY DATA
-        indent = "  " * level
-        print(f"\n{indent}📄 TITLE: {title}")
-        print(f"{indent}🔗 URL:   {web_url}")
-        print(f"{indent}📝 CONTENT PREVIEW: {raw_content[:150].strip()}...")
-        print(f"{indent}{'-' * 40}")
-
-        # 4. RECURSIVE STEP: Find children
-        children = confluence.get_page_child_by_type(page_id, type='page')
-        for child in children:
-            verify_and_print_pages(child['id'], level + 1)
-
-    except Exception as e:
-        print(f"❌ Error fetching page {page_id}: {e}")
-
-print(f"🚀 Starting verification crawl for Parent ID: {PARENT_PAGE_ID}...")
-verify_and_print_pages(PARENT_PAGE_ID)
-print("\n✅ Verification Complete.")
-
-
-
-
-from atlassian import Confluence
-import urllib3
-import time # <--- New import for the delay
-
-# 1. SSL & LOGGING SETUP
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-BASE_URL = "https://confluence/confluence" 
-TOKEN = "your_personal_access_token_here" 
-PARENT_PAGE_ID = "123456789"
-
-# 2. CONFIGURE CONFLUENCE WITH RETRY LOGIC
-confluence = Confluence(
-    url=BASE_URL, 
-    token=TOKEN, 
-    verify_ssl=False,
-    backoff_and_retry=True # <--- Tells the API to handle 429s automatically
-)
-
-from atlassian import Confluence
-import urllib3
-import time
-
-# 1. SETUP
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-BASE_URL = "https://confluence/confluence" 
-TOKEN = "your_token"
-SPACE_KEY = "abcd" 
-START_PAGE_TITLE = "somepage"
-
-# Initialize
-confluence = Confluence(url=BASE_URL, token=TOKEN, verify_ssl=False)
+def clean_html(raw_html):
+    """Converts Confluence XHTML into clean text for the AI."""
+    if not raw_html:
+        return ""
+    soup = BeautifulSoup(raw_html, "html.parser")
+    # Remove script and style elements
+    for script_or_style in soup(["script", "style"]):
+        script_or_style.decompose()
+    return soup.get_text(separator=' ', strip=True)
 
 def recursive_search_by_title(space, title, level=0):
     indent = "  " * level
     try:
-        # 2. FETCH CONTENT USING YOUR WORKING METHOD
-        # The library's get_page_by_title uses the exact URL params you found
+        # FETCH
         page = confluence.get_page_by_title(space=space, title=title, expand='body.storage')
         
-        if not page:
-            print(f"{indent}⚠️ Could not find page: {title}")
+        # ERROR CHECK: If page is a string, it means the API returned an error message
+        if isinstance(page, str):
+            print(f"{indent}❌ API returned a string instead of data for '{title}'.")
+            print(f"{indent}Response Snippet: {page[:100]}")
             return
 
-        page_id = page.get('id')
-        content = page.get('body', {}).get('storage', {}).get('value', '')
-        
-        print(f"{indent}📄 FOUND: {title} (ID: {page_id})")
-        print(f"{indent}📝 CONTENT SIZE: {len(content)} chars")
+        if not page or 'id' not in page:
+            print(f"{indent}⚠️ Page not found or access denied: {title}")
+            return
 
-        # 3. FIND CHILDREN BY ID
-        # Once we have the ID from the title, we find its children
+        # EXTRACT
+        page_id = page['id']
+        raw_content = page.get('body', {}).get('storage', {}).get('value', '')
+        clean_text = clean_html(raw_content)
+        
+        print(f"{indent}📄 {title} (ID: {page_id})")
+        print(f"{indent}✨ Clean Text Preview: {clean_text[:75]}...")
+
+        # FIND CHILDREN
+        # We use the ID to find children, but then we recurse using their titles
         children = confluence.get_page_child_by_type(page_id, type='page')
         
         for child in children:
-            child_title = child.get('title')
-            time.sleep(0.5) # Anti-429 delay
-            # Dive into the child using its title
-            recursive_search_by_title(space, child_title, level + 1)
+            if isinstance(child, dict) and 'title' in child:
+                time.sleep(0.5)
+                recursive_search_by_title(space, child['title'], level + 1)
 
     except Exception as e:
-        print(f"{indent}❌ Error on '{title}': {e}")
+        print(f"{indent}💥 Python Error: {e}")
 
-print(f"🚀 Starting crawl in Space: {SPACE_KEY} starting at: {START_PAGE_TITLE}")
+print(f"🚀 Verifying: {SPACE_KEY} / {START_PAGE_TITLE}")
 recursive_search_by_title(SPACE_KEY, START_PAGE_TITLE)
