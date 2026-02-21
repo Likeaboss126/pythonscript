@@ -1,96 +1,63 @@
-import requests
-import json
+import os
+from atlassian import Confluence
+from langchain_community.document_loaders import ConfluenceLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_ollama import OllamaEmbeddings
+from langchain_chroma import Chroma
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "phi3:mini"  # 🔁 change to your model
+# --- 1. CONFIGURATION ---
+CONFLUENCE_URL = "https://your-company.atlassian.net/wiki"
+USERNAME = "your-email@company.com"
+API_TOKEN = "your-atlassian-api-token"
+PARENT_PAGE_ID = "123456789"  # The ID of the "Top" page
+DB_PATH = "./local_confluence_db" # Folder where Chroma will save data
 
-def generate_explanation(plan_json: dict) -> str:
-    """
-    Sends financial plan JSON to local Ollama model
-    and returns a simple human-readable explanation.
-    """
+# --- 2. GET ALL CHILD PAGES RECURSIVELY ---
+def get_all_page_ids(confluence_api, page_id):
+    """Recursively finds all child page IDs."""
+    ids = [page_id]
+    children = confluence_api.get_child_pages(page_id)
+    for child in children:
+        ids.extend(get_all_page_ids(confluence_api, child['id']))
+    return list(set(ids))
 
-    system_prompt = """
-You are a financial planning assistant.
+print("🔍 Navigating Confluence hierarchy...")
+confluence_api = Confluence(url=CONFLUENCE_URL, username=USERNAME, password=API_TOKEN)
+all_ids = get_all_page_ids(confluence_api, PARENT_PAGE_ID)
+print(f"✅ Found {len(all_ids)} pages (Parent + Children).")
 
-Explain the financial plan in simple, friendly language.
+# --- 3. LOAD CONTENT ---
+print("📥 Fetching page content...")
+loader = ConfluenceLoader(
+    url=CONFLUENCE_URL,
+    username=USERNAME,
+    api_key=API_TOKEN
+)
+# Load text from the list of IDs we found
+documents = loader.load(page_ids=all_ids)
 
-Specifically:
-- Explain the moderate risk allocation (equity vs debt)
-- Explain how the expected portfolio return (CAGR) is derived
-  from equity and debt returns using the given allocation
-- Mention whether each goal is on track
--Mention the expected retirement corpus in simple terms.
-- Summarize the retirement outlook
+# --- 4. CHUNK DATA ---
+# mxbai-embed-large has a 512-token limit (~2000 chars). 
+# We use 800 characters to ensure the model doesn't truncate the meaning.
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800, 
+    chunk_overlap=100,
+    separators=["\n\n", "\n", " ", ""]
+)
+docs = text_splitter.split_documents(documents)
+print(f"✂️ Split {len(documents)} pages into {len(docs)} chunks.")
 
-IMPORTANT RULES:
-- Do NOT add new numbers
-- Do NOT change any values
-- Use ONLY the provided data
-- Do NOT show calculations or formulas
-- Keep the explanation concise and easy to understand
-"""
+# --- 5. CREATE VECTOR DB ---
+print(f"🧠 Generating vectors with mxbai-embed-large...")
 
-    user_prompt = f"""
-Financial Plan Data:
-{json.dumps(plan_json, indent=2)}
-"""
+# Note: mxbai requires a specific prefix for queries, 
+# which we will handle during the search phase.
+embeddings = OllamaEmbeddings(model="mxbai-embed-large")
 
-    payload = {
-        "model": MODEL_NAME,
-        "prompt": system_prompt + "\n" + user_prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0,
-            "top_p": 1
-        }
-    }
+vector_db = Chroma.from_documents(
+    documents=docs, 
+    embedding=embeddings,
+    persist_directory=DB_PATH
+)
 
-    try:
-        response = requests.post(OLLAMA_URL, json=payload)
-        response.raise_for_status()
-        result = response.json()
-
-        explanation_text = result.get("response", "").strip()
-        return explanation_text
-
-    except Exception as e:
-        return f"Error generating explanation: {str(e)}"
-
-
-
-plan_json = {
-    "user_profile": {
-        "age": 35,
-        "risk_profile": "Moderate",
-        "retirement_year": 2060
-    },
-    "allocation": {
-        "equity": 0.6,
-        "debt": 0.4
-    },
-    "portfolio_assumptions": {
-        "equity_return": 11,
-        "debt_return": 6.5,
-        "portfolio_cagr": 9.5
-    },
-    "goals": [
-        {
-            "name": "Child Education",
-            "status": "On Track"
-        },
-        {
-            "name": "Vacation",
-            "status": "On Track"
-        }
-    ],
-    "retirement_projection": {
-        "monthly_investment": 45000,
-        "projection_year": 2060,
-expected_corpus": 42000000,
-        "goal_status": "On Track"
-    }
-}
-
-text = generate_explanation(plan_json)
-print(text)
+print(f"🎉 Success! Vector DB created locally at: {DB_PATH}")
