@@ -1,108 +1,105 @@
 import requests
 import time
 import urllib3
+from urllib.parse import quote_plus
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE_URL = "https://<domain>.atlassian.net/wiki"
 TOKEN = "YOUR_BEARER_TOKEN"
 SPACE_KEY = "ABCD"
-PARENT_TITLE = "My Parent Page"
+PARENT_TITLE = "Data Issues"
 
 headers = {
     "Accept": "application/json",
     "Authorization": f"Bearer {TOKEN}"
 }
 
-# ---------- Safe GET with 429 handling ----------
-def safe_get(url, params=None):
-    while True:
-        r = requests.get(url, headers=headers, params=params, verify=False)
+# ---------- Safe GET with backoff ----------
+def safe_get(url, max_retries=4):
+    wait_time = 5
+
+    for attempt in range(max_retries):
+        r = requests.get(url, headers=headers, verify=False)
 
         if r.status_code == 429:
-            retry = int(r.headers.get("Retry-After", "5"))
-            print(f"⏳ Rate limited. Sleeping {retry}s")
-            time.sleep(retry)
+            retry_after = int(r.headers.get("Retry-After", wait_time))
+            print(f"⏳ Rate limited. Sleeping {retry_after}s")
+            time.sleep(retry_after)
+            wait_time *= 2
             continue
 
         r.raise_for_status()
         return r.json()
 
-# ---------- 1️⃣ Get parent page ID by title (cheap) ----------
-def get_parent_page_id():
-    url = f"{BASE_URL}/rest/api/content"
-    params = {
-        "spaceKey": SPACE_KEY,
-        "title": PARENT_TITLE,
-        "limit": 1
-    }
+    raise Exception("❌ Max retries exceeded due to rate limiting")
 
-    data = safe_get(url, params)
+# ---------- 1️⃣ Get parent page ID by title ----------
+def get_parent_page_id():
+    encoded_title = quote_plus(PARENT_TITLE)
+
+    url = (
+        f"{BASE_URL}/rest/api/content"
+        f"?spaceKey={SPACE_KEY}&title={encoded_title}&limit=1"
+    )
+
+    data = safe_get(url)
 
     if data["size"] == 0:
-        raise Exception(f"❌ Parent page '{PARENT_TITLE}' not found in space '{SPACE_KEY}'")
+        raise Exception("❌ Parent page not found")
 
     parent_id = data["results"][0]["id"]
     print(f"📄 Parent ID: {parent_id}")
     return parent_id
 
-# ---------- 2️⃣ Get small list of pages in space (cheap) ----------
-def get_pages_in_space():
-    url = f"{BASE_URL}/rest/api/content"
-    params = {
-        "spaceKey": SPACE_KEY,
-        "limit": 25,
-        "expand": "ancestors"   # needed to detect parent-child locally
-    }
-
-    data = safe_get(url, params)
-    return data["results"]
-
-# ---------- 3️⃣ Find children locally using ancestors ----------
-def find_children(pages, parent_id):
+# ---------- 2️⃣ Paginate space and collect children ----------
+def find_children(parent_id):
     children = []
+    start = 0
+    limit = 25
 
-    for p in pages:
-        if p.get("ancestors"):
-            if p["ancestors"][-1]["id"] == parent_id:
-                children.append(p)
+    while True:
+        url = (
+            f"{BASE_URL}/rest/api/content"
+            f"?spaceKey={SPACE_KEY}&limit={limit}&start={start}&expand=ancestors"
+        )
 
-    print(f"📂 Found {len(children)} child pages")
+        data = safe_get(url)
+
+        for page in data["results"]:
+            if page.get("ancestors"):
+                # last ancestor = direct parent
+                if page["ancestors"][-1]["id"] == parent_id:
+                    children.append({
+                        "id": page["id"],
+                        "title": page["title"]
+                    })
+
+        # Stop early if children found and no need to scan full space
+        if children:
+            break
+
+        if "next" not in data["_links"]:
+            break
+
+        start += limit
+        time.sleep(2)  # prevent rate burst
+
     return children
-
-# ---------- 4️⃣ Fetch page body (heavy → add delay) ----------
-def get_page_body(page_id):
-    url = f"{BASE_URL}/rest/api/content/{page_id}"
-    params = {"expand": "body.storage"}
-
-    data = safe_get(url, params)
-    time.sleep(2)  # 🔥 prevent 429
-
-    return data["title"], data["body"]["storage"]["value"]
 
 # ---------- MAIN ----------
 if __name__ == "__main__":
-    print("🔍 Finding parent page...")
+    print("🔍 Finding parent...")
     parent_id = get_parent_page_id()
 
-    print("📥 Fetching small space page list...")
-    pages = get_pages_in_space()
+    print("🔎 Scanning space for children (cheap)...")
+    children = find_children(parent_id)
 
-    children = find_children(pages, parent_id)
-
-    print("\n📖 Reading content (parent + children)...\n")
-
-    # Parent content
-    title, body = get_page_body(parent_id)
-    print("PARENT:", title)
-
-    # Children content
+    print("\n📂 Child pages found:")
     for c in children:
-        title, body = get_page_body(c["id"])
-        print("CHILD:", title)
+        print(f"{c['id']} → {c['title']}")
 
-    print("\n✅ Done.")
+    if not children:
+        print("⚠️ No children found in scanned pages")
 
-
-f"{BASE_URL}/rest/api/content"
-        f"?spaceKey={SPACE_KEY}&title={encoded_title}&limit=1"
+    print("\n✅ POC complete (no heavy API calls)")
