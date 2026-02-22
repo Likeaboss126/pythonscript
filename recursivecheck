@@ -2,120 +2,82 @@ import requests
 import time
 import urllib3
 
-# Disable SSL warnings (since verify=False)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE_URL = "https://<domain>.atlassian.net/wiki"
-BEARER_TOKEN = "YOUR_BEARER_TOKEN"
+TOKEN = "YOUR_BEARER_TOKEN"
+SPACE_KEY = "ABCD"
+PARENT_TITLE = "My Parent Page"
 
 headers = {
     "Accept": "application/json",
-    "Authorization": f"Bearer {BEARER_TOKEN}"
+    "Authorization": f"Bearer {TOKEN}"
 }
 
-# ---------- Safe GET with rate limit + JSON check ----------
 def safe_get(url, params=None):
     while True:
-        response = requests.get(
-            url,
-            headers=headers,
-            params=params,
-            verify=False
-        )
+        r = requests.get(url, headers=headers, params=params, verify=False)
 
-        if response.status_code == 429:
-            retry_after = int(response.headers.get("Retry-After", "5"))
-            print(f"⏳ Rate limited. Sleeping {retry_after} sec...")
-            time.sleep(retry_after)
+        if r.status_code == 429:
+            retry = int(r.headers.get("Retry-After", "5"))
+            print(f"⏳ Sleeping {retry}s due to rate limit")
+            time.sleep(retry)
             continue
 
-        content_type = response.headers.get("Content-Type", "")
-        if "application/json" not in content_type:
-            print("❌ Non-JSON response received:")
-            print(response.text[:500])
-            raise Exception("Expected JSON but got HTML/other")
+        r.raise_for_status()
+        return r.json()
 
-        return response.json()
-
-# ---------- Get page ID by space + title ----------
-def get_page_by_title(space_key, title):
+# 1️⃣ Get small list of pages in space (cheap)
+def get_pages_in_space():
     url = f"{BASE_URL}/rest/api/content"
     params = {
-        "spaceKey": space_key,
-        "title": title,
-        "limit": 1
+        "spaceKey": SPACE_KEY,
+        "limit": 10,
+        "expand": "ancestors"
     }
+    return safe_get(url, params)["results"]
 
-    data = safe_get(url, params)
-
-    if data["size"] == 0:
-        raise Exception(f"Page '{title}' not found in space '{space_key}'")
-
-    return data["results"][0]["id"]
-
-# ---------- Get page body (heavy call) ----------
-def get_page_body(page_id):
-    url = f"{BASE_URL}/rest/api/content/{page_id}"
-    params = {
-        "expand": "body.storage"
-    }
-
-    data = safe_get(url, params)
-
-    title = data["title"]
-    body = data["body"]["storage"]["value"]
-
-    return title, body
-
-# ---------- Get child pages (paginated) ----------
-def get_child_pages(page_id):
-    url = f"{BASE_URL}/rest/api/content/{page_id}/child/page"
-
+# 2️⃣ Find parent + children locally
+def find_parent_and_children(pages):
+    parent_id = None
     children = []
-    start = 0
-    limit = 25
 
-    while True:
-        params = {
-            "start": start,
-            "limit": limit
-        }
-
-        data = safe_get(url, params)
-        children.extend(data["results"])
-
-        if len(data["results"]) < limit:
+    for p in pages:
+        if p["title"] == PARENT_TITLE:
+            parent_id = p["id"]
             break
 
-        start += limit
+    if not parent_id:
+        raise Exception("Parent page not found")
 
-    return children
+    for p in pages:
+        if p.get("ancestors"):
+            if p["ancestors"][-1]["id"] == parent_id:
+                children.append(p)
 
-# ---------- Recursive traversal ----------
-def traverse_page(page_id, depth=0):
-    title, body = get_page_body(page_id)
+    return parent_id, children
 
-    print("  " * depth + f"📄 {title}")
+# 3️⃣ Fetch body only for specific pages (slow + safe)
+def get_page_body(page_id):
+    url = f"{BASE_URL}/rest/api/content/{page_id}"
+    params = {"expand": "body.storage"}
+    data = safe_get(url, params)
+    time.sleep(2)  # prevent 429
+    return data["title"], data["body"]["storage"]["value"]
 
-    # Optional: process body here
-    # print(body[:200])
+# ---- MAIN ----
+pages = get_pages_in_space()
+parent_id, children = find_parent_and_children(pages)
 
-    time.sleep(2)  # Prevent rate limit (important)
+print(f"📄 Parent ID: {parent_id}")
+print("📂 Children IDs:", [c["id"] for c in children])
 
-    children = get_child_pages(page_id)
+# Fetch content (only few pages → safe)
+print("\n📖 Reading content...\n")
 
-    for child in children:
-        traverse_page(child["id"], depth + 1)
+title, body = get_page_body(parent_id)
+print("PARENT:", title)
 
-# ---------- MAIN ----------
-if __name__ == "__main__":
-    SPACE_KEY = "ABC"
-    PAGE_TITLE = "MyPageTitle"
-
-    print("🔍 Finding root page...")
-    root_page_id = get_page_by_title(SPACE_KEY, PAGE_TITLE)
-
-    print("🌳 Traversing page tree...\n")
-    traverse_page(root_page_id)
-
-    print("\n✅ Done.")
+for c in children:
+    title, body = get_page_body(c["id"])
+    print("CHILD:", title)
