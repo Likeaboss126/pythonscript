@@ -102,3 +102,7 @@ if __name__ == "__main__":
         print("CHILD:", title)
 
     print("\n✅ Done.")
+
+
+f"{BASE_URL}/rest/api/content"
+        f"?spaceKey={SPACE_KEY}&title={encoded_title}&limit=1"
