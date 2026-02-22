@@ -14,70 +14,91 @@ headers = {
     "Authorization": f"Bearer {TOKEN}"
 }
 
+# ---------- Safe GET with 429 handling ----------
 def safe_get(url, params=None):
     while True:
         r = requests.get(url, headers=headers, params=params, verify=False)
 
         if r.status_code == 429:
             retry = int(r.headers.get("Retry-After", "5"))
-            print(f"⏳ Sleeping {retry}s due to rate limit")
+            print(f"⏳ Rate limited. Sleeping {retry}s")
             time.sleep(retry)
             continue
 
         r.raise_for_status()
         return r.json()
 
-# 1️⃣ Get small list of pages in space (cheap)
+# ---------- 1️⃣ Get parent page ID by title (cheap) ----------
+def get_parent_page_id():
+    url = f"{BASE_URL}/rest/api/content"
+    params = {
+        "spaceKey": SPACE_KEY,
+        "title": PARENT_TITLE,
+        "limit": 1
+    }
+
+    data = safe_get(url, params)
+
+    if data["size"] == 0:
+        raise Exception(f"❌ Parent page '{PARENT_TITLE}' not found in space '{SPACE_KEY}'")
+
+    parent_id = data["results"][0]["id"]
+    print(f"📄 Parent ID: {parent_id}")
+    return parent_id
+
+# ---------- 2️⃣ Get small list of pages in space (cheap) ----------
 def get_pages_in_space():
     url = f"{BASE_URL}/rest/api/content"
     params = {
         "spaceKey": SPACE_KEY,
-        "limit": 10,
-        "expand": "ancestors"
+        "limit": 25,
+        "expand": "ancestors"   # needed to detect parent-child locally
     }
-    return safe_get(url, params)["results"]
 
-# 2️⃣ Find parent + children locally
-def find_parent_and_children(pages):
-    parent_id = None
+    data = safe_get(url, params)
+    return data["results"]
+
+# ---------- 3️⃣ Find children locally using ancestors ----------
+def find_children(pages, parent_id):
     children = []
-
-    for p in pages:
-        if p["title"] == PARENT_TITLE:
-            parent_id = p["id"]
-            break
-
-    if not parent_id:
-        raise Exception("Parent page not found")
 
     for p in pages:
         if p.get("ancestors"):
             if p["ancestors"][-1]["id"] == parent_id:
                 children.append(p)
 
-    return parent_id, children
+    print(f"📂 Found {len(children)} child pages")
+    return children
 
-# 3️⃣ Fetch body only for specific pages (slow + safe)
+# ---------- 4️⃣ Fetch page body (heavy → add delay) ----------
 def get_page_body(page_id):
     url = f"{BASE_URL}/rest/api/content/{page_id}"
     params = {"expand": "body.storage"}
+
     data = safe_get(url, params)
-    time.sleep(2)  # prevent 429
+    time.sleep(2)  # 🔥 prevent 429
+
     return data["title"], data["body"]["storage"]["value"]
 
-# ---- MAIN ----
-pages = get_pages_in_space()
-parent_id, children = find_parent_and_children(pages)
+# ---------- MAIN ----------
+if __name__ == "__main__":
+    print("🔍 Finding parent page...")
+    parent_id = get_parent_page_id()
 
-print(f"📄 Parent ID: {parent_id}")
-print("📂 Children IDs:", [c["id"] for c in children])
+    print("📥 Fetching small space page list...")
+    pages = get_pages_in_space()
 
-# Fetch content (only few pages → safe)
-print("\n📖 Reading content...\n")
+    children = find_children(pages, parent_id)
 
-title, body = get_page_body(parent_id)
-print("PARENT:", title)
+    print("\n📖 Reading content (parent + children)...\n")
 
-for c in children:
-    title, body = get_page_body(c["id"])
-    print("CHILD:", title)
+    # Parent content
+    title, body = get_page_body(parent_id)
+    print("PARENT:", title)
+
+    # Children content
+    for c in children:
+        title, body = get_page_body(c["id"])
+        print("CHILD:", title)
+
+    print("\n✅ Done.")
