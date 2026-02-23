@@ -339,3 +339,71 @@ if user_input := st.chat_input("Ask about data issues..."):
             # Save to history
             source_text = "\n\n**Sources:** " + ", ".join([t for t, u in sources])
             st.session_state.messages.append({"role": "assistant", "content": full_answer + source_text})
+
+
+
+
+
+
+
+import requests
+import time
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+BASE_URL = "https://<domain>.atlassian.net/wiki"
+TOKEN = "YOUR_BEARER_TOKEN"
+SPACE_KEY = "ABCD"
+
+headers = {
+    "Accept": "application/json",
+    "Authorization": f"Bearer {TOKEN}"
+}
+
+def safe_get(url, max_retries=4):
+    wait_time = 5
+
+    for attempt in range(max_retries):
+        r = requests.get(url, headers=headers, verify=False)
+
+        if r.status_code == 429:
+            retry_after = int(r.headers.get("Retry-After", wait_time))
+            print(f"⏳ Rate limited. Sleeping {retry_after}s")
+            time.sleep(retry_after)
+            wait_time *= 2
+            continue
+
+        r.raise_for_status()
+        return r.json()
+
+    raise Exception("❌ Max retries exceeded")
+
+def print_page_titles_with_ancestors():
+    start = 0
+    limit = 25
+    page_count = 0
+
+    while True:
+        url = (
+            f"{BASE_URL}/rest/api/content"
+            f"?spaceKey={SPACE_KEY}&limit={limit}&start={start}&expand=ancestors"
+        )
+
+        data = safe_get(url)
+
+        for page in data["results"]:
+            page_count += 1
+            print(f"{page_count}. {page['title']}")
+
+        if "next" not in data["_links"]:
+            break
+
+        start += limit
+        time.sleep(2)  # prevent rate burst
+
+    print(f"\n✅ Total pages fetched: {page_count}")
+
+if __name__ == "__main__":
+    print("🔎 Fetching page titles (with ancestors, cheap)...\n")
+    print_page_titles_with_ancestors()
