@@ -1,104 +1,60 @@
-import requests
-import time
 import urllib3
-from urllib.parse import quote_plus
-from bs4 import BeautifulSoup
-
-# LangChain / Local Model Imports
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+# Suppress SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- CONFIG ---
-BASE_URL = "https://<domain>.atlassian.net/wiki"
-TOKEN = "YOUR_BEARER_TOKEN"
-SPACE_KEY = "ABCD"
-PARENT_TITLE = "Data Issues"
 DB_PATH = "./confluence_vector_db"
-MODEL_PATH = "/path/to/your/local/model" # Path to your mxbai folder
-CHILD_LIMIT = 7  # 🛑 POC LIMIT
+MODEL_PATH = "/path/to/your/local/model" # Must be the same path used for creation
 
-headers = {
-    "Accept": "application/json",
-    "Authorization": f"Bearer {TOKEN}"
-}
+# --- 1. LOAD LOCAL EMBEDDINGS ---
+print(f"🚀 Loading local model from: {MODEL_PATH}")
+embeddings = HuggingFaceEmbeddings(
+    model_name=MODEL_PATH,
+    model_kwargs={'device': 'cpu'}
+)
 
-def clean_html(raw_html):
-    if not raw_html: return ""
-    return BeautifulSoup(raw_html, "html.parser").get_text(separator=' ', strip=True)
+# --- 2. CONNECT TO LOCAL DB ---
+print(f"📂 Connecting to ChromaDB at: {DB_PATH}")
+vector_db = Chroma(
+    persist_directory=DB_PATH, 
+    embedding_function=embeddings
+)
 
-# 1️⃣ GET PARENT ID
-def get_parent_id():
-    url = f"{BASE_URL}/rest/api/content?spaceKey={SPACE_KEY}&title={quote_plus(PARENT_TITLE)}&limit=1"
-    r = requests.get(url, headers=headers, verify=False)
-    data = r.json()
-    if data["size"] == 0: raise Exception("❌ Parent page not found")
-    return data["results"][0]["id"]
-
-# 2️⃣ SCAN SPACE WITH ANCESTOR LOGIC + LIMIT
-def scan_for_children(parent_id):
-    documents = []
-    start = 0
-    limit = 25 # API batch size
+def verify_retrieval(query, k=3):
+    """
+    k = number of matching chunks to return
+    """
+    print(f"\n🔍 Searching for: '{query}'")
+    print("=" * 60)
     
-    print(f"🔎 Scanning space for {CHILD_LIMIT} children of {PARENT_TITLE}...")
+    # This performs the mathematical similarity search
+    results = vector_db.similarity_search(query, k=k)
     
-    while len(documents) < CHILD_LIMIT:
-        url = f"{BASE_URL}/rest/api/content?spaceKey={SPACE_KEY}&limit={limit}&start={start}&expand=ancestors,body.storage"
-        r = requests.get(url, headers=headers, verify=False)
-        data = r.json()
+    if not results:
+        print("❌ No matching chunks found. The database might be empty.")
+        return
 
-        for page in data["results"]:
-            # --- YOUR ANCESTOR LOGIC ---
-            if page.get("ancestors") and page["ancestors"][-1]["id"] == parent_id:
-                title = page["title"]
-                raw_body = page.get("body", {}).get("storage", {}).get("value", "")
-                
-                documents.append(Document(
-                    page_content=clean_html(raw_body),
-                    metadata={
-                        "title": title,
-                        "source": f"{BASE_URL}/pages/viewpage.action?pageId={page['id']}"
-                    }
-                ))
-                print(f"✅ Found ({len(documents)}/{CHILD_LIMIT}): {title}")
-                
-                # Stop immediately if we hit the POC limit
-                if len(documents) >= CHILD_LIMIT:
-                    break
+    for i, doc in enumerate(results, 1):
+        print(f"MATCH #{i}")
+        print(f"📄 PAGE TITLE: {doc.metadata.get('title')}")
+        print(f"🔗 SOURCE URL: {doc.metadata.get('source')}")
+        # Print a snippet of the text found
+        content_snippet = doc.page_content[:500].replace('\n', ' ')
+        print(f"📝 TEXT FOUND: {content_snippet}...")
+        print("-" * 60)
 
-        if "next" not in data["_links"] or len(documents) >= CHILD_LIMIT:
-            break
-
-        start += limit
-        time.sleep(0.5)
-        
-    return documents
-
-# 3️⃣ MAIN EXECUTION
+# --- MAIN LOOP ---
 if __name__ == "__main__":
-    p_id = get_parent_id()
-    raw_docs = scan_for_children(p_id)
+    print("\n✅ Verification System Ready.")
+    print("This script checks the 'Brain' of your search without using an AI LLM.")
     
-    if raw_docs:
-        # Split into chunks
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        chunks = splitter.split_documents(raw_docs)
-
-        print(f"🚀 Loading Local Model: {MODEL_PATH}")
-        # Equivalent to SentenceTransformers(MODEL_PATH)
-        embeddings = HuggingFaceEmbeddings(
-            model_name=MODEL_PATH,
-            model_kwargs={'device': 'cpu'}
-        )
-
-        print("🧠 Creating Vector DB...")
-        vector_db = Chroma.from_documents(
-            documents=chunks,
-            embedding=embeddings,
-            persist_directory=DB_PATH
-        )
-        print(f"🎉 POC Complete. {len(raw_docs)} pages stored in {DB_PATH}")
+    while True:
+        user_query = input("\nEnter a search term to test (or 'exit'): ")
+        if user_query.lower() in ['exit', 'quit']:
+            break
+        
+        # We ask for the top 3 most relevant chunks
+        verify_retrieval(user_query, k=3)
