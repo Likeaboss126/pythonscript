@@ -2,104 +2,103 @@ import requests
 import time
 import urllib3
 from urllib.parse import quote_plus
+from bs4 import BeautifulSoup
+
+# Vector DB Imports
+from langchain_ollama import OllamaEmbeddings
+from langchain_chroma import Chroma
+from langchain.docstore.document import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# --- CONFIG ---
 BASE_URL = "https://<domain>.atlassian.net/wiki"
 TOKEN = "YOUR_BEARER_TOKEN"
 SPACE_KEY = "ABCD"
 PARENT_TITLE = "Data Issues"
+DB_PATH = "./confluence_vector_db"
 
 headers = {
     "Accept": "application/json",
     "Authorization": f"Bearer {TOKEN}"
 }
 
-# ---------- Safe GET with backoff ----------
-def safe_get(url, max_retries=4):
-    wait_time = 5
+def safe_get(url):
+    r = requests.get(url, headers=headers, verify=False)
+    r.raise_for_status()
+    return r.json()
 
-    for attempt in range(max_retries):
-        r = requests.get(url, headers=headers, verify=False)
+def clean_html(raw_html):
+    if not raw_html: return ""
+    return BeautifulSoup(raw_html, "html.parser").get_text(separator=' ', strip=True)
 
-        if r.status_code == 429:
-            retry_after = int(r.headers.get("Retry-After", wait_time))
-            print(f"⏳ Rate limited. Sleeping {retry_after}s")
-            time.sleep(retry_after)
-            wait_time *= 2
-            continue
-
-        r.raise_for_status()
-        return r.json()
-
-    raise Exception("❌ Max retries exceeded due to rate limiting")
-
-# ---------- 1️⃣ Get parent page ID by title ----------
-def get_parent_page_id():
-    encoded_title = quote_plus(PARENT_TITLE)
-
-    url = (
-        f"{BASE_URL}/rest/api/content"
-        f"?spaceKey={SPACE_KEY}&title={encoded_title}&limit=1"
-    )
-
+# 1️⃣ YOUR ANCESTOR LOGIC (Enhanced to fetch content)
+def get_parent_id():
+    url = f"{BASE_URL}/rest/api/content?spaceKey={SPACE_KEY}&title={quote_plus(PARENT_TITLE)}&limit=1"
     data = safe_get(url)
+    if data["size"] == 0: raise Exception("❌ Parent not found")
+    return data["results"][0]["id"]
 
-    if data["size"] == 0:
-        raise Exception("❌ Parent page not found")
-
-    parent_id = data["results"][0]["id"]
-    print(f"📄 Parent ID: {parent_id}")
-    return parent_id
-
-# ---------- 2️⃣ Paginate space and collect children ----------
-def find_children(parent_id):
-    children = []
+def find_children_and_content(parent_id):
+    documents = []
     start = 0
     limit = 25
-
+    
+    print(f"🔎 Scanning space {SPACE_KEY} for children of {parent_id}...")
+    
     while True:
+        # We add 'body.storage' to the expand list so we get content while we scan
         url = (
             f"{BASE_URL}/rest/api/content"
-            f"?spaceKey={SPACE_KEY}&limit={limit}&start={start}&expand=ancestors"
+            f"?spaceKey={SPACE_KEY}&limit={limit}&start={start}&expand=ancestors,body.storage"
         )
-
         data = safe_get(url)
 
         for page in data["results"]:
-            if page.get("ancestors"):
-                # last ancestor = direct parent
-                if page["ancestors"][-1]["id"] == parent_id:
-                    children.append({
-                        "id": page["id"],
-                        "title": page["title"]
-                    })
-
-        # Stop early if children found and no need to scan full space
-        if children:
-            break
+            # --- YOUR ORIGINAL ANCESTOR CHECK ---
+            if page.get("ancestors") and page["ancestors"][-1]["id"] == parent_id:
+                title = page["title"]
+                raw_body = page.get("body", {}).get("storage", {}).get("value", "")
+                
+                print(f"✅ Found & Reading: {title}")
+                
+                # Wrap in LangChain Document format
+                documents.append(Document(
+                    page_content=clean_html(raw_body),
+                    metadata={
+                        "title": title, 
+                        "id": page["id"], 
+                        "source": f"{BASE_URL}/pages/viewpage.action?pageId={page['id']}"
+                    }
+                ))
 
         if "next" not in data["_links"]:
             break
 
         start += limit
-        time.sleep(2)  # prevent rate burst
+        time.sleep(1) # Polite delay
+        
+    return documents
 
-    return children
-
-# ---------- MAIN ----------
+# 2️⃣ CHROMA DB CREATION
 if __name__ == "__main__":
-    print("🔍 Finding parent...")
-    parent_id = get_parent_page_id()
+    p_id = get_parent_id()
+    raw_docs = find_children_and_content(p_id)
+    
+    if not raw_docs:
+        print("⚠️ No child pages found. Check if the parent ID is correct.")
+    else:
+        print(f"✂️ Splitting {len(raw_docs)} pages into chunks...")
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        chunks = splitter.split_documents(raw_docs)
 
-    print("🔎 Scanning space for children (cheap)...")
-    children = find_children(parent_id)
-
-    print("\n📂 Child pages found:")
-    for c in children:
-        print(f"{c['id']} → {c['title']}")
-
-    if not children:
-        print("⚠️ No children found in scanned pages")
-
-    print("\n✅ POC complete (no heavy API calls)")
+        print(f"🧠 Creating Vector DB at {DB_PATH}...")
+        embeddings = OllamaEmbeddings(model="mxbai-embed-large")
+        
+        vector_db = Chroma.from_documents(
+            documents=chunks,
+            embedding=embeddings,
+            persist_directory=DB_PATH
+        )
+        print(f"🎉 Success! {len(chunks)} chunks stored in ChromaDB.")
