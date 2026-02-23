@@ -58,3 +58,18 @@ if __name__ == "__main__":
         
         # We ask for the top 3 most relevant chunks
         verify_retrieval(user_query, k=3)
+
+
+
+
+
+
+# Syntax: docker cp "C:\path\to\your\model.gguf" <container_name_or_id>:/root/model.gguf
+docker cp "C:\Users\YourName\Downloads\llama-3.2-1b.gguf" ollama:/root/local-model.gguf
+
+eds a "recipe" to understand how to handle that file. You need to create a small text file named Modelfile inside the cont
+docker exec -it ollama sh -c "echo 'FROM /root/local-model.gguf' > /root/Modelfile"
+
+docker exec -it ollama ollama create my-custom-model -f /root/Modelfile
+
+docker exec -it ollama ollama list
