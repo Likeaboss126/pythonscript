@@ -161,3 +161,89 @@ if prompt := st.chat_input("Ask about participations..."):
             st.markdown(full_response)
             
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+
+
+import streamlit as st
+import urllib3
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaLLM
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
+# Suppress SSL warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- CONFIGURATION ---
+DB_PATH = "./confluence_vector_db"
+MODEL_PATH = "C:/path/to/your/local/mxbai-model" # Use absolute Windows path
+LLM_NAME = "my-custom-model" # The name you used in 'ollama create'
+# If Docker is on your local machine, 'localhost' is correct.
+OLLAMA_URL = "http://localhost:11434" 
+
+# --- PAGE SETUP ---
+st.set_page_config(page_title="Confluence AI", page_icon="🏢")
+st.title("🏢 Confluence POC Assistant")
+
+# --- LOAD SYSTEM ---
+@st.cache_resource
+def init_rag():
+    # 1. Local Embeddings (The 'Search Engine')
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    
+    # 2. Vector DB
+    vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    retriever = vector_db.as_retriever(search_kwargs={"k": 3})
+    
+    # 3. Docker-hosted LLM (The 'Librarian')
+    llm = OllamaLLM(model=LLM_NAME, base_url=OLLAMA_URL, temperature=0)
+    
+    # 4. The Prompt (2026 optimized)
+    template = """Answer the question based ONLY on the following context:
+    {context}
+    
+    Question: {question}
+    """
+    prompt = ChatPromptTemplate.from_template(template)
+    
+    # 5. LCEL Chain (The Modern Way)
+    # This replaces the old RetrievalQA
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    return chain, retriever
+
+rag_chain, retriever = init_rag()
+
+# --- CHAT UI ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for msg in st.session_state.messages:
+    st.chat_message(msg["role"]).write(msg["content"])
+
+if user_input := st.chat_input("Ask about participations..."):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.chat_message("user").write(user_input)
+    
+    with st.chat_message("assistant"):
+        with st.spinner("Analyzing 7 pages..."):
+            # Get answer
+            full_answer = rag_chain.invoke(user_input)
+            
+            # Get sources separately for citation
+            docs = retriever.invoke(user_input)
+            source_list = list(set([d.metadata.get('title') for d in docs]))
+            
+            final_text = f"{full_answer}\n\n**Sources:** {', '.join(source_list)}"
+            st.write(final_text)
+            st.session_state.messages.append({"role": "assistant", "content": final_text})
