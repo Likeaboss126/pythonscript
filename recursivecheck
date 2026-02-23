@@ -73,3 +73,91 @@ docker exec -it ollama sh -c "echo 'FROM /root/local-model.gguf' > /root/Modelfi
 docker exec -it ollama ollama create my-custom-model -f /root/Modelfile
 
 docker exec -it ollama ollama list
+
+
+
+
+
+
+import streamlit as st
+import urllib3
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaLLM
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+
+# Suppress SSL warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- CONFIGURATION ---
+DB_PATH = "./confluence_vector_db"
+MODEL_PATH = "/path/to/your/local/embedding/model" # Your mxbai-embed-large folder
+LLM_NAME = "my-custom-model" # 🎯 The name you gave it in 'ollama create'
+
+# --- PAGE SETUP ---
+st.set_page_config(page_title="Confluence AI Assistant", page_icon="🤖")
+st.title("🤖 Confluence Data Assistant")
+st.markdown("Querying 7 specific 'Data Issues' pages via Local RAG.")
+
+# --- INITIALIZE MODELS (Cached to prevent reloading on every click) ---
+@st.cache_resource
+def load_rag_system():
+    # 1. Embeddings
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    
+    # 2. Vector DB
+    vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    
+    # 3. LLM (Pointing to your Docker Ollama)
+    # Default is localhost:11434; if Docker is on another IP, use base_url="http://IP:11434"
+    llm = OllamaLLM(model=LLM_NAME, temperature=0)
+    
+    # 4. Prompt
+    template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+    Use the context to answer the question concisely. If unsure, say you don't know.<|eot_id|>
+    <|start_header_id|>user<|end_header_id|>
+    CONTEXT: {context}
+    QUESTION: {question}<|eot_id|>
+    <|start_header_id|>assistant<|end_header_id|>"""
+    
+    prompt = PromptTemplate(input_variables=["context", "question"], template=template)
+    
+    # 5. Chain
+    return RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vector_db.as_retriever(search_kwargs={"k": 3}),
+        return_source_documents=True,
+        chain_type_kwargs={"prompt": prompt}
+    )
+
+qa_chain = load_rag_system()
+
+# --- CHAT INTERFACE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display chat history
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# User Input
+if prompt := st.chat_input("Ask about participations..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = qa_chain.invoke({"query": prompt})
+            answer = response["result"]
+            
+            # Extract unique sources
+            sources = list(set([doc.metadata.get('title') for doc in response["source_documents"]]))
+            
+            full_response = f"{answer}\n\n**Sources:** {', '.join(sources)}"
+            st.markdown(full_response)
+            
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
