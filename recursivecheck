@@ -247,3 +247,95 @@ if user_input := st.chat_input("Ask about participations..."):
             final_text = f"{full_answer}\n\n**Sources:** {', '.join(source_list)}"
             st.write(final_text)
             st.session_state.messages.append({"role": "assistant", "content": final_text})
+
+
+
+
+import streamlit as st
+import urllib3
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaLLM
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- CONFIGURATION ---
+DB_PATH = "./confluence_vector_db"
+MODEL_PATH = "C:/path/to/your/local/mxbai-model" 
+LLM_NAME = "my-custom-model" 
+OLLAMA_URL = "http://localhost:11434" 
+
+# --- LOAD SYSTEM ---
+@st.cache_resource
+def init_rag():
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    retriever = vector_db.as_retriever(search_kwargs={"k": 3})
+    
+    llm = OllamaLLM(model=LLM_NAME, base_url=OLLAMA_URL, temperature=0)
+    
+    template = """Answer the question based ONLY on the following context:
+    {context}
+    
+    Question: {question}
+    """
+    prompt = ChatPromptTemplate.from_template(template)
+
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    return chain, retriever
+
+rag_chain, retriever = init_rag()
+
+# --- CHAT UI ---
+st.title("🏢 Confluence Data Assistant")
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for msg in st.session_state.messages:
+    st.chat_message(msg["role"]).write(msg["content"])
+
+if user_input := st.chat_input("Ask about data issues..."):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.chat_message("user").write(user_input)
+    
+    with st.chat_message("assistant"):
+        with st.spinner("Analyzing Confluence pages..."):
+            # 1. Generate the Answer
+            full_answer = rag_chain.invoke(user_input)
+            
+            # 2. Retrieve the original Documents to get Metadata
+            docs = retriever.invoke(user_input)
+            
+            # 3. Create a unique list of (Title, URL) pairs
+            sources = []
+            for d in docs:
+                title = d.metadata.get('title', 'Unknown Page')
+                url = d.metadata.get('source', '#')
+                if (title, url) not in sources:
+                    sources.append((title, url))
+            
+            # 4. Display the Answer
+            st.write(full_answer)
+            
+            # 5. Display the Clickable Sources
+            st.markdown("---")
+            st.write("**References:**")
+            for title, url in sources:
+                st.markdown(f"- [{title}]({url})")
+            
+            # Save to history
+            source_text = "\n\n**Sources:** " + ", ".join([t for t, u in sources])
+            st.session_state.messages.append({"role": "assistant", "content": full_answer + source_text})
