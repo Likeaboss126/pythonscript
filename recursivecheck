@@ -407,3 +407,83 @@ def print_page_titles_with_ancestors():
 if __name__ == "__main__":
     print("🔎 Fetching page titles (with ancestors, cheap)...\n")
     print_page_titles_with_ancestors()
+
+
+
+
+import logging
+import requests
+import time
+import urllib3
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+# --- LOGGING CONFIG ---
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("indexing.log"), # Writes to file
+        logging.StreamHandler()              # Also prints to terminal
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# --- CONFIG ---
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+BASE_URL = "https://<domain>.atlassian.net/wiki"
+TOKEN = "YOUR_BEARER_TOKEN"
+SPACE_KEY = "ABCD"
+DB_PATH = "./confluence_vector_db"
+EMBED_MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+
+headers = {"Accept": "application/json", "Authorization": f"Bearer {TOKEN}"}
+
+def build_index():
+    start = 0
+    limit = 25
+    langchain_docs = []
+    
+    logger.info(f"🚀 Starting crawl for space: {SPACE_KEY}")
+    
+    try:
+        while True:
+            url = f"{BASE_URL}/rest/api/content?spaceKey={SPACE_KEY}&limit={limit}&start={start}&expand=body.storage"
+            r = requests.get(url, headers=headers, verify=False)
+            
+            if r.status_code == 429:
+                retry = int(r.headers.get("Retry-After", 10))
+                logger.warning(f"⚠️ Rate limited. Sleeping {retry}s")
+                time.sleep(retry)
+                continue
+            
+            data = r.json()
+            if not data["results"]: break
+                
+            for page in data["results"]:
+                title = page['title']
+                content = page.get("body", {}).get("storage", {}).get("value", "")
+                langchain_docs.append(Document(page_content=content, metadata={"title": title}))
+                logger.info(f"✅ Cached: {title}")
+
+            if "next" not in data["_links"]: break
+            start += limit
+            time.sleep(1)
+
+        logger.info(f"📦 Total pages found: {len(langchain_docs)}. Starting split...")
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        chunks = splitter.split_documents(langchain_docs)
+        
+        logger.info(f"💾 Generating Embeddings for {len(chunks)} chunks. This will take time...")
+        embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL_PATH)
+        Chroma.from_documents(documents=chunks, embedding=embeddings, persist_directory=DB_PATH)
+        
+        logger.info("🏁 SUCCESS: Vector database build complete!")
+
+    except Exception as e:
+        logger.error(f"❌ FATAL ERROR: {str(e)}", exc_info=True)
+
+if __name__ == "__main__":
+    build_index()
