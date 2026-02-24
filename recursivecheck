@@ -934,3 +934,35 @@ if prompt := st.chat_input("Ask about projects, owners, or latest updates..."):
             st.markdown(f"[{idx+1}] **{title}** \n*{space}* | [View Page]({link})")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
+
+
+
+if prompt := st.chat_input("Ask about projects, owners, or latest updates..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        # 1. Use st.status to show 'Thinking' steps
+        with st.status("🔍 Thinking...", expanded=True) as status:
+            st.write("Searching database for relevant pages...")
+            # Perform the recency-aware search
+            context_docs = get_sorted_context(prompt, vector_db)
+            
+            st.write("Sorting results by latest modified date...")
+            # (Sorting happens inside get_sorted_context)
+            
+            st.write("Synthesizing answer with Llama 3.2...")
+            status.update(label="✅ Information Found", state="complete", expanded=False)
+
+        # 2. Display the actual response
+        # Using a spinner for the final generation if not streaming
+        with st.spinner("Generating final response..."):
+            # Your LLM call logic here
+            # response = llm.invoke(full_prompt)
+            response = "Based on the latest documentation from 2026..." 
+            st.markdown(response)
+
+        # 3. Show sources as before
+        st.divider()
+        # ... (sources code)
