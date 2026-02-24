@@ -487,3 +487,48 @@ def build_index():
 
 if __name__ == "__main__":
     build_index()
+
+
+
+
+
+
+import streamlit as st
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# --- GLOBAL CONFIG ---
+DB_PATH = "./confluence_vector_db"
+MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+
+# This is the "Magic" that stops the loading lag
+@st.cache_resource
+def load_system():
+    # 1. Load the "brain" (Embedding Model)
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    
+    # 2. Open the 160MB "Library" (ChromaDB)
+    # This only happens ONCE
+    vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    
+    return vector_db
+
+# --- INITIALIZATION ---
+# This line will run instantly after the first load
+vector_db = load_system()
+
+# --- MAIN UI ---
+st.title("🏢 Confluence Assistant")
+st.write("Ready to answer questions.")
+
+
+
+# Instead of a hardcoded string, let's use the exact Cloud format
+# Ensure your BASE_URL ends with '/wiki'
+for title, url in sources:
+    # Most Confluence Cloud links work best in this format:
+    # https://<your-domain>.atlassian.net/wiki/spaces/<spacekey>/pages/<pageid>
+    # OR the universal static link:
+    clean_url = f"{BASE_URL}/pages/viewpage.action?pageId={url.split('=')[-1]}"
+    
+    st.markdown(f"- [{title}]({clean_url})")
