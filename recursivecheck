@@ -703,3 +703,111 @@ def build_foolproof_traversal_db():
 
 if __name__ == "__main__":
     build_foolproof_traversal_db()
+
+
+
+import requests
+import time
+import urllib3
+from markdownify import markdownify as md  # pip install markdownify
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# --- CONFIG ---
+BASE_URL = "https://<domain>.atlassian.net/wiki"
+TOKEN = "YOUR_BEARER_TOKEN"
+SPACE_KEY = "ABCD"
+DB_PATH = "./confluence_gold_v2"
+EMBED_MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+
+headers = {"Accept": "application/json", "Authorization": f"Bearer {TOKEN}"}
+
+def build_foolproof_traversal_db():
+    start = 0
+    limit = 25
+    langchain_docs = []
+    
+    print(f"🚜 Starting Deep Crawl for Space: {SPACE_KEY}...")
+
+    while True:
+        # We use the standard endpoint but expand history and ancestors
+        url = (
+            f"{BASE_URL}/rest/api/content"
+            f"?spaceKey={SPACE_KEY}&limit={limit}&start={start}"
+            f"&expand=body.storage,history.lastUpdated,history.createdBy,ancestors"
+        )
+
+        r = requests.get(url, headers=headers, verify=False)
+        if r.status_code == 429:
+            time.sleep(10)
+            continue
+        
+        data = r.json()
+        results = data.get("results", [])
+        if not results:
+            break
+
+        for page in results:
+            title = page['title']
+            page_id = page['id']
+            
+            # 1. HTML to Markdown (Better for Llama to read tables/lists)
+            html_content = page.get("body", {}).get("storage", {}).get("value", "")
+            markdown_content = md(html_content, heading_style="ATX")
+            
+            # 2. Extract Metadata
+            author = page.get("history", {}).get("createdBy", {}).get("displayName", "Unknown")
+            mod_date = page.get("history", {}).get("lastUpdated", {}).get("when", "Unknown")
+            
+            # 3. Pathing (Breadcrumbs)
+            path = " > ".join([a['title'] for a in page.get("ancestors", [])] + [title])
+
+            # 4. Contextual Header (Injecting 'Mudit' and 'Date' into the text)
+            header = (
+                f"DOCUMENT: {title}\n"
+                f"PATH: {path}\n"
+                f"AUTHOR: {author}\n"
+                f"LAST_MODIFIED: {mod_date}\n"
+                f"--- CONTENT START ---\n"
+            )
+
+            doc = Document(
+                page_content=header + markdown_content,
+                metadata={
+                    "title": title,
+                    "source": f"{BASE_URL}/pages/viewpage.action?pageId={page_id}",
+                    "author": author,
+                    "last_modified": mod_date,
+                    "path": path
+                }
+            )
+            langchain_docs.append(doc)
+            print(f"  ✅ Cached: {title} (Owner: {author})")
+
+        if "next" not in data["_links"]:
+            break
+
+        start += limit
+        time.sleep(1) # Be gentle on the API
+
+    # --- Processing ---
+    print(f"\n📦 Splitting {len(langchain_docs)} docs into chunks...")
+    # Markdown splitter helps keep headers with their content
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000, 
+        chunk_overlap=150,
+        separators=["\n# ", "\n## ", "\n### ", "\n\n", "\n", " "]
+    )
+    final_chunks = splitter.split_documents(langchain_docs)
+
+    print(f"💾 Building Vector DB at {DB_PATH}...")
+    embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL_PATH)
+    Chroma.from_documents(final_chunks, embeddings, persist_directory=DB_PATH)
+    print("🏁 SUCCESS: Your foolproof database is ready.")
+
+if __name__ == "__main__":
+    build_foolproof_traversal_db()
