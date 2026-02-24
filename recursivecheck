@@ -966,3 +966,76 @@ if prompt := st.chat_input("Ask about projects, owners, or latest updates..."):
         # 3. Show sources as before
         st.divider()
         # ... (sources code)
+
+
+
+
+import requests
+from markdownify import markdownify as md
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+# --- CONFIG ---
+SPACE_KEYS = ["SPACE_A", "SPACE_B"] # Add all your spaces here
+DB_PATH = "./unified_confluence_db" # Use a new folder name
+MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+
+def build_unified_database():
+    all_docs = []
+    
+    for space in SPACE_KEYS:
+        print(f"🚜 Starting Crawl for Space: {space}...")
+        start = 0
+        limit = 50
+        
+        while True:
+            # Traversal method (Standard API)
+            url = f"{BASE_URL}/rest/api/content?spaceKey={space}&limit={limit}&start={start}&expand=body.storage,history.lastUpdated,history.createdBy,ancestors"
+            r = requests.get(url, headers=headers, verify=False)
+            data = r.json()
+            results = data.get("results", [])
+            
+            if not results: break
+
+            for page in results:
+                # 1. Clean Content
+                markdown_text = md(page.get("body", {}).get("storage", {}).get("value", ""))
+                
+                # 2. Metadata Extraction
+                author = page.get("history", {}).get("createdBy", {}).get("displayName", "Unknown")
+                mod_date = page.get("history", {}).get("lastUpdated", {}).get("when", "Unknown")
+                
+                # 3. Contextual Header (for the 'Mudit' and 'Date' search)
+                header = f"SPACE: {space}\nAUTHOR: {author}\nDATE: {mod_date}\n\n"
+
+                doc = Document(
+                    page_content=header + markdown_text,
+                    metadata={
+                        "title": page['title'],
+                        "source": f"{BASE_URL}/pages/viewpage.action?pageId={page['id']}",
+                        "space": space,
+                        "last_modified": mod_date,
+                        "author": author
+                    }
+                )
+                all_docs.append(doc)
+            
+            if "next" not in data["_links"]: break
+            start += limit
+            print(f"  ✅ Cached {len(all_docs)} total documents so far...")
+
+    # --- FINAL PROCESSING ---
+    print(f"📦 Splitting into chunks...")
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
+    chunks = splitter.split_documents(all_docs)
+
+    print(f"💾 Building Vector DB. This is the long part...")
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    # This creates the NEW unified folder
+    Chroma.from_documents(chunks, embeddings, persist_directory=DB_PATH)
+    print("🏁 SUCCESS: Your multi-space, foolproof database is ready!")
+
+if __name__ == "__main__":
+    build_unified_database()
