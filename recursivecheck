@@ -532,3 +532,64 @@ for title, url in sources:
     clean_url = f"{BASE_URL}/pages/viewpage.action?pageId={url.split('=')[-1]}"
     
     st.markdown(f"- [{title}]({clean_url})")
+
+
+
+
+
+vimport requests
+from markdownify import markdownify as md
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+
+# --- CONFIG ---
+BASE_URL = "https://<domain>.atlassian.net/wiki"
+DB_PATH = "./confluence_gold_v1"
+MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+
+def build_expert_db():
+    # Use the search API to get the newest stuff first
+    cql = f"space = '{SPACE_KEY}' AND type = page ORDER BY lastmodified DESC"
+    url = f"{BASE_URL}/rest/api/content/search?cql={cql}&expand=body.storage,history.lastUpdated,history.createdBy,ancestors"
+    
+    # ... (Standard Request Logic) ...
+    
+    processed_docs = []
+    for page in results:
+        # 1. Convert messy XML to clean Markdown for Llama
+        html_body = page.get("body", {}).get("storage", {}).get("value", "")
+        markdown_body = md(html_body, heading_style="ATX")
+        
+        # 2. Build Breadcrumb Path (e.g., HR > Policies > 2026)
+        path = " > ".join([a['title'] for a in page.get("ancestors", [])] + [page['title']])
+        
+        # 3. Contextual Injection (The "Secret Sauce")
+        # We put key info at the TOP of every chunk so it's always in the AI's window
+        header = f"--- DOCUMENT START ---\nPATH: {path}\nOWNER: {page['history']['createdBy']['displayName']}\nMODIFIED: {page['history']['lastUpdated']['when']}\n\n"
+        
+        doc = Document(
+            page_content=header + markdown_body,
+            metadata={
+                "source": f"{BASE_URL}/pages/viewpage.action?pageId={page['id']}",
+                "path": path,
+                "author": page['history']['createdBy']['displayName'],
+                "date": page['history']['lastUpdated']['when']
+            }
+        )
+        processed_docs.append(doc)
+
+    # 4. Smart Splitting (Markdown aware)
+    # This prevents splitting a Markdown table in half
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=150,
+        separators=["\n### ", "\n## ", "\n# ", "\n\n", "\n", " "]
+    )
+    chunks = splitter.split_documents(processed_docs)
+    
+    # 5. Build the Index
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    Chroma.from_documents(chunks, embeddings, persist_directory=DB_PATH)
+    print(f"✅ Foolproof DB built with {len(chunks)} contextual chunks.")
