@@ -811,3 +811,126 @@ def build_foolproof_traversal_db():
 
 if __name__ == "__main__":
     build_foolproof_traversal_db()
+
+
+
+
+
+import streamlit as st
+import os
+from datetime import datetime
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.llms import Ollama # Or your specific Llama loader
+
+# --- CONFIGURATION ---
+DB_PATH = "./unified_confluence_db"
+MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+LLM_NAME = "llama3.2:1b" # Change to your exact local model name
+
+# --- 1. SYSTEM INITIALIZATION (CACHED) ---
+@st.cache_resource
+def initialize_system():
+    """Loads the embedding model and vector database into memory once."""
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    return vector_db
+
+# --- 2. RECENCY-AWARE SEARCH LOGIC ---
+def get_sorted_context(query, vector_db, k_fetch=12, k_return=5):
+    """
+    Fetches the top semantic matches and then re-ranks them by date.
+    """
+    # Step A: Get a larger pool of semantically relevant chunks
+    docs = vector_db.similarity_search(query, k=k_fetch)
+    
+    # Step B: Helper to parse Confluence ISO dates
+    def parse_date(doc):
+        # Default to very old date if missing
+        dt_str = doc.metadata.get("last_modified", "1900-01-01T00:00:00.000Z")
+        try:
+            # Handle ISO format and timezone Z
+            return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        except:
+            return datetime(1900, 1, 1)
+
+    # Step C: Sort by date (Descending - Newest first)
+    docs.sort(key=parse_date, reverse=True)
+    
+    # Step D: Return the top 'k_return' chunks to the LLM
+    return docs[:k_return]
+
+# --- 3. STREAMLIT UI ---
+st.set_page_config(page_title="Confluence Intelligence", layout="wide")
+
+# Sidebar Stats
+with st.sidebar:
+    st.title("⚙️ System Status")
+    if os.path.exists(DB_PATH):
+        vector_db = initialize_system()
+        count = vector_db._collection.count()
+        st.success(f"Database Connected")
+        st.metric("Indexed Chunks", f"{count:,}")
+        st.info("Sorting Mode: 🔥 Recency-First (Newest data prioritized)")
+    else:
+        st.error("Database not found! Please run the indexing script first.")
+        st.stop()
+
+st.title("🧠 Confluence RAG Assistant")
+st.caption("Querying multiple spaces with date-priority ranking.")
+
+# Chat Interface
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if prompt := st.chat_input("Ask about projects, owners, or latest updates..."):
+    # Add user message to UI
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        # A. Retrieve & Sort Context
+        with st.status("Searching across spaces...", expanded=False) as status:
+            context_docs = get_sorted_context(prompt, vector_db)
+            status.update(label="✅ Context retrieved and sorted by date", state="complete")
+
+        # B. Construct Context Block
+        context_text = ""
+        sources = []
+        for i, doc in enumerate(context_docs):
+            m = doc.metadata
+            context_text += f"\n--- DOCUMENT {i+1} (Space: {m.get('space', 'Unknown')}) ---\n"
+            context_text += f"Title: {m.get('title')}\nDate: {m.get('last_modified')}\nContent: {doc.page_content}\n"
+            sources.append((m.get('title'), m.get('source'), m.get('space')))
+
+        # C. Generate Answer (Using local Ollama or your LLM instance)
+        # Replace the following logic with your specific LLM call
+        full_prompt = f"""Use the following documentation snippets (sorted by most recent) to answer the question.
+        If the answer isn't in the context, say you don't know.
+        
+        CONTEXT:
+        {context_text}
+        
+        QUESTION: {prompt}
+        """
+        
+        # Placeholder for LLM invocation
+        # llm = Ollama(model=LLM_NAME)
+        # response = llm.invoke(full_prompt)
+        response = "This is a placeholder. Please connect your LLM (Ollama/Llama) here." 
+        
+        st.markdown(response)
+        
+        # D. Display Sources with clean links
+        st.divider()
+        st.write("📂 **Sources used (Most recent first):**")
+        cols = st.columns(len(sources))
+        for idx, (title, link, space) in enumerate(sources):
+            st.markdown(f"[{idx+1}] **{title}** \n*{space}* | [View Page]({link})")
+
+    st.session_state.messages.append({"role": "assistant", "content": response})
