@@ -1053,3 +1053,43 @@ space_counts = Counter([m.get('space') for m in all_metadata])
 print("📊 Space Distribution in Database:")
 for space, count in space_counts.items():
     print(f" - {space}: {count} chunks")
+
+
+
+
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+
+# --- CONFIG ---
+DB_PATH = "./unified_confluence_db"
+MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+
+def check_db_health():
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    
+    # 1. Total Count
+    collection = db._collection
+    total_chunks = collection.count()
+    print(f"📊 Total Chunks in DB: {total_chunks}")
+
+    # 2. Check Space Distribution
+    # We grab a sample and see if 'space' exists in metadata
+    sample = collection.get(limit=10)
+    spaces_found = set([m.get('space') for m in sample['metadatas']])
+    print(f"📂 Spaces detected in sample: {spaces_found}")
+
+    # 3. Test "Mudit" Search (The Metadata Test)
+    print("\n🔍 Testing Search for 'Mudit'...")
+    results = db.similarity_search("Who is Mudit?", k=3)
+    
+    for i, doc in enumerate(results):
+        print(f"\n--- Result {i+1} ---")
+        print(f"Title: {doc.metadata.get('title')}")
+        print(f"Space: {doc.metadata.get('space')}")
+        print(f"Date:  {doc.metadata.get('last_modified')}")
+        # Print first 100 chars to check for the 'Context Header'
+        print(f"Content Preview: {doc.page_content[:100]}...")
+
+if __name__ == "__main__":
+    check_db_health()
