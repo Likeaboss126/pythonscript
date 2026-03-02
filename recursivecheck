@@ -1093,3 +1093,149 @@ def check_db_health():
 
 if __name__ == "__main__":
     check_db_health()
+
+
+
+
+import streamlit as st
+import os
+from datetime import datetime
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_community.llms import Ollama # Uncomment and use your local loader
+
+# --- CONFIGURATION ---
+DB_PATH = "./unified_confluence_db"
+MODEL_PATH = "C:/path/to/your/local/mxbai-model"
+LLM_NAME = "llama3.2:1b" 
+
+# --- 1. THE CACHE ENGINE ---
+@st.cache_resource(show_spinner=False)
+def load_vector_db():
+    """
+    Loads the Embedding Model and Vector DB into RAM once.
+    Using @st.cache_resource ensures the 160MB+ DB stays pinned in memory.
+    """
+    if not os.path.exists(DB_PATH):
+        return None
+    
+    embeddings = HuggingFaceEmbeddings(model_name=MODEL_PATH)
+    vector_db = Chroma(persist_directory=DB_PATH, embedding_function=embeddings)
+    return vector_db
+
+# --- 2. THE DATE-AWARE SEARCH ENGINE ---
+def perform_recency_search(query, _db, selected_spaces, k_fetch=15, k_return=5):
+    """
+    The underscore '_db' tells Streamlit not to hash the heavy database object.
+    """
+    # Create the Space Filter
+    search_filter = {"space": {"$in": selected_spaces}} if selected_spaces else {}
+    
+    # Step A: Semantic Search (Finding the most relevant text)
+    docs = _db.similarity_search(query, k=k_fetch, filter=search_filter)
+    
+    # Step B: Date Parsing & Sorting (Newest First)
+    def parse_date(doc):
+        dt_str = doc.metadata.get("last_modified", "1900-01-01T00:00:00.000Z")
+        try:
+            return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        except:
+            return datetime(1900, 1, 1)
+
+    docs.sort(key=parse_date, reverse=True)
+    return docs[:k_return]
+
+# --- 3. UI LAYOUT ---
+st.set_page_config(page_title="Confluence AI Hub", layout="wide")
+
+# Sidebar for Controls and Health Check
+with st.sidebar:
+    st.title("⚙️ System Control")
+    
+    db = load_vector_db()
+    
+    if db:
+        st.success("Database Loaded in RAM")
+        st.metric("Total Indexed Chunks", f"{db._collection.count():,}")
+        
+        st.divider()
+        st.subheader("Filter by Space")
+        # Define your Space Keys exactly as they are in your Metadata
+        available_spaces = ["SPACE_A", "SPACE_B"] 
+        target_spaces = st.multiselect("Select Spaces to Query", available_spaces, default=available_spaces)
+        
+        st.divider()
+        # CACHE REFRESH BUTTON
+        if st.button("♻️ Refresh / Reload DB", use_container_width=True):
+            st.cache_resource.clear()
+            st.rerun()
+            
+    else:
+        st.error(f"DB not found at: {DB_PATH}")
+        st.info("Please run your indexing script first to build the database.")
+        st.stop()
+
+st.title("🧠 Confluence RAG Assistant")
+st.markdown(f"Querying across: `{', '.join(target_spaces)}` | **Priority: Latest Updates First**")
+
+# --- 4. CHAT HISTORY ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# --- 5. THE SEARCH & RESPONSE LOOP ---
+if prompt := st.chat_input("Ask about project owners, status, or recent changes..."):
+    # Store User Message
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        # STEP 1: THINKING STATUS
+        with st.status("🔍 Searching and Sorting...", expanded=True) as status:
+            st.write(f"Querying ChromaDB for: '{prompt}'")
+            context_docs = perform_recency_search(prompt, db, target_spaces)
+            
+            st.write(f"Retrieved {len(context_docs)} chunks from {len(target_spaces)} spaces.")
+            st.write("Ranking by 'last_modified' metadata...")
+            
+            # Prepare context for the LLM
+            context_text = ""
+            for d in context_docs:
+                m = d.metadata
+                context_text += f"\n[SOURCE: {m['title']} | SPACE: {m['space']} | DATE: {m['last_modified']}]\n{d.page_content}\n"
+            
+            status.update(label="✅ Context Optimized", state="complete", expanded=False)
+
+        # STEP 2: GENERATION
+        with st.spinner("Llama 3.2 is synthesizing an answer..."):
+            # Construct Final Instructions
+            llm_prompt = f"""You are a Confluence Assistant. Use the provided documentation to answer the user.
+            IMPORTANT: Always prioritize information from the LATEST date. 
+            Specify the date and space in your answer if relevant.
+            
+            CONTEXT:
+            {context_text}
+            
+            QUESTION: {prompt}
+            """
+            
+            # Placeholder for your local LLM call
+            # response = llm.invoke(llm_prompt)
+            response = f"Simulated Response: I found information about '{prompt}' in {target_spaces}. The latest update was on {context_docs[0].metadata['last_modified'] if context_docs else 'N/A'}."
+            st.markdown(response)
+
+        # STEP 3: SOURCE CARDS
+        st.markdown("### 📂 Relevant Pages")
+        cols = st.columns(len(context_docs))
+        for i, doc in enumerate(context_docs):
+            with cols[i]:
+                with st.container(border=True):
+                    st.caption(f"**{doc.metadata['space']}**")
+                    st.markdown(f"**[{doc.metadata['title']}]({doc.metadata['source']})**")
+                    st.caption(f"📅 {doc.metadata['last_modified'][:10]}")
+
+    st.session_state.messages.append({"role": "assistant", "content": response})
