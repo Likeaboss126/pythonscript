@@ -1039,3 +1039,17 @@ def build_unified_database():
 
 if __name__ == "__main__":
     build_unified_database()
+
+
+
+# Assuming 'db' is your loaded Chroma instance
+collection = db._collection
+all_metadata = collection.get(include=['metadatas'])['metadatas']
+
+# Count occurrences of each space
+from collections import Counter
+space_counts = Counter([m.get('space') for m in all_metadata])
+
+print("📊 Space Distribution in Database:")
+for space, count in space_counts.items():
+    print(f" - {space}: {count} chunks")
