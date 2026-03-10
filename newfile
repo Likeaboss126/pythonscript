@@ -3,47 +3,50 @@ import chromadb
 from bs4 import BeautifulSoup
 from chromadb.utils import embedding_functions
 
-# -----------------------------
-# CONFIG
-# -----------------------------
 
-CONFLUENCE_BASE_URL = "https://your-company.atlassian.net/wiki"
-USERNAME = "your_email"
-API_TOKEN = "your_api_token"
+# ----------------------------------
+# CONFIGURATION
+# ----------------------------------
 
-# Only ingest these pages (example)
+CONFLUENCE_BASE_URL = "https://your-domain.atlassian.net/wiki"
+USERNAME = "your-email"
+API_TOKEN = "your-api-token"
+
+# Only these pages will be indexed
 PAGE_IDS = [
     "12345678",
     "23456789",
     "34567890"
 ]
 
-# -----------------------------
+
+# ----------------------------------
 # CHROMA SETUP
-# -----------------------------
+# ----------------------------------
 
 embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
     model_name="all-MiniLM-L6-v2"
 )
 
-chroma_client = chromadb.Client(
+client = chromadb.Client(
     chromadb.config.Settings(
         persist_directory="./confluence_chroma_db"
     )
 )
 
-collection = chroma_client.get_or_create_collection(
+collection = client.get_or_create_collection(
     name="confluence_docs",
     embedding_function=embedding_function
 )
 
-# -----------------------------
-# FETCH CONFLUENCE PAGE
-# -----------------------------
+
+# ----------------------------------
+# FETCH PAGE FROM CONFLUENCE
+# ----------------------------------
 
 def fetch_page(page_id):
 
-    url = f"{CONFLUENCE_BASE_URL}/rest/api/content/{page_id}?expand=body.storage,version"
+    url = f"{CONFLUENCE_BASE_URL}/rest/api/content/{page_id}?expand=body.storage"
 
     response = requests.get(
         url,
@@ -60,94 +63,182 @@ def fetch_page(page_id):
     return title, html, page_url
 
 
-# -----------------------------
-# CLEAN HTML
-# -----------------------------
+# ----------------------------------
+# PARSE CONFLUENCE HTML
+# ----------------------------------
 
-def html_to_text(html):
+def parse_confluence_html(html):
 
     soup = BeautifulSoup(html, "html.parser")
 
-    for tag in soup(["script", "style"]):
-        tag.decompose()
-
-    text = soup.get_text("\n")
-
-    return text
-
-
-# -----------------------------
-# SIMPLE CHUNKING
-# -----------------------------
-
-def chunk_text(text, chunk_size=500):
-
-    paragraphs = text.split("\n")
-
     chunks = []
-    current_chunk = ""
+    current_heading = "General"
 
-    for para in paragraphs:
+    for element in soup.descendants:
 
-        if len(current_chunk) + len(para) < chunk_size:
-            current_chunk += " " + para
-        else:
-            chunks.append(current_chunk.strip())
-            current_chunk = para
+        # HEADINGS
+        if element.name in ["h1","h2","h3","h4","h5","h6"]:
 
-    if current_chunk:
-        chunks.append(current_chunk.strip())
+            current_heading = element.get_text(strip=True)
+
+
+        # PARAGRAPHS
+        elif element.name == "p":
+
+            text = element.get_text(strip=True)
+
+            if text:
+                chunks.append({
+                    "heading": current_heading,
+                    "text": text,
+                    "type": "paragraph"
+                })
+
+
+        # LISTS
+        elif element.name in ["ul","ol"]:
+
+            items = []
+
+            for li in element.find_all("li", recursive=False):
+
+                item = li.get_text(strip=True)
+
+                if item:
+                    items.append(f"- {item}")
+
+            if items:
+                chunks.append({
+                    "heading": current_heading,
+                    "text": "\n".join(items),
+                    "type": "list"
+                })
+
+
+        # TABLES
+        elif element.name == "table":
+
+            rows = []
+
+            for tr in element.find_all("tr"):
+
+                cols = [td.get_text(strip=True) for td in tr.find_all(["td","th"])]
+
+                if cols:
+                    rows.append(" | ".join(cols))
+
+            if rows:
+                chunks.append({
+                    "heading": current_heading,
+                    "text": "\n".join(rows),
+                    "type": "table"
+                })
+
+
+        # CODE
+        elif element.name == "code":
+
+            code_text = element.get_text()
+
+            if code_text:
+                chunks.append({
+                    "heading": current_heading,
+                    "text": code_text,
+                    "type": "code"
+                })
+
+
+        # CONFLUENCE MACROS
+        elif element.name == "ac:structured-macro":
+
+            macro_name = element.get("ac:name")
+
+            if macro_name == "expand":
+
+                title = element.find("ac:parameter")
+                expand_title = title.get_text(strip=True) if title else "Expand Section"
+
+                expand_text = element.get_text(strip=True)
+
+                chunks.append({
+                    "heading": current_heading,
+                    "text": f"{expand_title}\n{expand_text}",
+                    "type": "expand"
+                })
+
+
+            if macro_name == "tabs":
+
+                tab_text = element.get_text(strip=True)
+
+                chunks.append({
+                    "heading": current_heading,
+                    "text": f"Tab Content\n{tab_text}",
+                    "type": "tab"
+                })
+
 
     return chunks
 
 
-# -----------------------------
+# ----------------------------------
+# STORE IN CHROMA
+# ----------------------------------
+
+def store_chunks(page_id, title, url, sections):
+
+    documents = []
+    metadatas = []
+    ids = []
+
+    for i, section in enumerate(sections):
+
+        chunk_id = f"{page_id}_{i}"
+
+        text = f"{section['heading']}\n{section['text']}"
+
+        documents.append(text)
+
+        metadatas.append({
+            "page_id": page_id,
+            "title": title,
+            "chunk_id": chunk_id,
+            "section_heading": section["heading"],
+            "section_type": section["type"],
+            "url": url
+        })
+
+        ids.append(chunk_id)
+
+    collection.add(
+        documents=documents,
+        metadatas=metadatas,
+        ids=ids
+    )
+
+
+# ----------------------------------
 # INGEST PAGES
-# -----------------------------
+# ----------------------------------
 
 def ingest_pages():
 
     for page_id in PAGE_IDS:
 
-        print(f"Ingesting page {page_id}")
+        print("Processing page:", page_id)
 
-        title, html, page_url = fetch_page(page_id)
+        title, html, url = fetch_page(page_id)
 
-        text = html_to_text(html)
+        sections = parse_confluence_html(html)
 
-        chunks = chunk_text(text)
+        store_chunks(page_id, title, url, sections)
 
-        documents = []
-        metadatas = []
-        ids = []
-
-        for i, chunk in enumerate(chunks):
-
-            chunk_id = f"{page_id}_{i}"
-
-            documents.append(chunk)
-
-            metadatas.append({
-                "page_id": page_id,
-                "title": title,
-                "chunk_id": chunk_id,
-                "url": page_url
-            })
-
-            ids.append(chunk_id)
-
-        collection.add(
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids
-        )
-
-        print(f"Stored {len(chunks)} chunks")
+        print(f"Stored {len(sections)} chunks")
 
 
-# -----------------------------
-# QUERY FUNCTION
-# -----------------------------
+# ----------------------------------
+# SEARCH
+# ----------------------------------
 
 def search(query):
 
@@ -156,12 +247,12 @@ def search(query):
         n_results=3
     )
 
-    documents = results["documents"][0]
-    metadatas = results["metadatas"][0]
+    docs = results["documents"][0]
+    metas = results["metadatas"][0]
 
-    for doc, meta in zip(documents, metadatas):
+    for doc, meta in zip(docs, metas):
 
-        print("\n------ RESULT ------\n")
+        print("\n-----------------------\n")
 
         print(doc)
 
@@ -169,9 +260,9 @@ def search(query):
         print("URL:", meta["url"])
 
 
-# -----------------------------
-# RUN
-# -----------------------------
+# ----------------------------------
+# MAIN
+# ----------------------------------
 
 if __name__ == "__main__":
 
