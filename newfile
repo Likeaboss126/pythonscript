@@ -324,3 +324,231 @@ if buffer:
         "heading": current_heading,
         "text": "\n".join(buffer)
     })
+
+
+
+
+
+import requests
+import chromadb
+from bs4 import BeautifulSoup
+from sentence_transformers import SentenceTransformer
+
+
+# -----------------------------
+# CONFIG
+# -----------------------------
+
+CONFLUENCE_BASE_URL = "https://your-domain.atlassian.net/wiki"
+USERNAME = "your-email"
+API_TOKEN = "your-api-token"
+
+PAGE_IDS = [
+    "12345678",
+    "23456789"
+]
+
+LOCAL_MODEL_PATH = "C:/models/bge-small-en"
+
+
+# -----------------------------
+# LOCAL EMBEDDING FUNCTION
+# -----------------------------
+
+class LocalEmbeddingFunction:
+
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input):
+        return self.model.encode(input, batch_size=32).tolist()
+
+
+# -----------------------------
+# LOAD MODEL
+# -----------------------------
+
+model = SentenceTransformer(LOCAL_MODEL_PATH)
+
+embedding_function = LocalEmbeddingFunction(model)
+
+
+# -----------------------------
+# INIT CHROMA
+# -----------------------------
+
+client = chromadb.Client(
+    chromadb.config.Settings(
+        persist_directory="./confluence_chroma_db"
+    )
+)
+
+collection = client.get_or_create_collection(
+    name="confluence_docs",
+    embedding_function=embedding_function
+)
+
+
+# -----------------------------
+# FETCH PAGE
+# -----------------------------
+
+def fetch_page(page_id):
+
+    url = f"{CONFLUENCE_BASE_URL}/rest/api/content/{page_id}?expand=body.storage"
+
+    response = requests.get(url, auth=(USERNAME, API_TOKEN))
+
+    data = response.json()
+
+    title = data["title"]
+
+    html = data["body"]["storage"]["value"]
+
+    page_url = f"{CONFLUENCE_BASE_URL}/pages/viewpage.action?pageId={page_id}"
+
+    return title, html, page_url
+
+
+# -----------------------------
+# PARSE HTML → SECTIONS
+# -----------------------------
+
+def parse_sections(html):
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    sections = []
+
+    current_heading = "General"
+
+    buffer = []
+
+    for element in soup.find_all(["h1","h2","h3","p","ul","ol"]):
+
+        if element.name in ["h1","h2","h3"]:
+
+            if buffer:
+                sections.append({
+                    "heading": current_heading,
+                    "text": "\n".join(buffer)
+                })
+                buffer = []
+
+            current_heading = element.get_text(strip=True)
+
+
+        elif element.name == "p":
+
+            text = element.get_text(strip=True)
+
+            if text:
+                buffer.append(text)
+
+
+        elif element.name in ["ul","ol"]:
+
+            for li in element.find_all("li"):
+                buffer.append("- " + li.get_text(strip=True))
+
+
+    if buffer:
+        sections.append({
+            "heading": current_heading,
+            "text": "\n".join(buffer)
+        })
+
+    return sections
+
+
+# -----------------------------
+# INGEST PAGES
+# -----------------------------
+
+def ingest_pages():
+
+    for page_id in PAGE_IDS:
+
+        print("Processing page:", page_id)
+
+        title, html, url = fetch_page(page_id)
+
+        sections = parse_sections(html)
+
+        documents = []
+        metadatas = []
+        ids = []
+
+        for i, section in enumerate(sections):
+
+            text = f"{section['heading']}\n{section['text']}"
+
+            chunk_id = f"{page_id}_{i}"
+
+            documents.append(text)
+
+            metadatas.append({
+                "page_id": page_id,
+                "title": title,
+                "section_heading": section["heading"],
+                "url": url
+            })
+
+            ids.append(chunk_id)
+
+        collection.add(
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids
+        )
+
+        print(f"Stored {len(sections)} chunks")
+
+
+# -----------------------------
+# SEARCH FUNCTION
+# -----------------------------
+
+def search(query):
+
+    results = collection.query(
+        query_texts=[query],
+        n_results=3
+    )
+
+    documents = results["documents"][0]
+
+    metadatas = results["metadatas"][0]
+
+    for doc, meta in zip(documents, metadatas):
+
+        preview = doc[:300]
+
+        print("\n============================")
+
+        print("Preview:\n")
+        print(preview)
+
+        print("\nPage:", meta["title"])
+
+        print("Section:", meta["section_heading"])
+
+        print("Open documentation:")
+        print(meta["url"])
+
+        print("============================\n")
+
+
+# -----------------------------
+# MAIN
+# -----------------------------
+
+if __name__ == "__main__":
+
+    ingest_pages()
+
+    while True:
+
+        question = input("\nAsk question: ")
+
+        search(question)
