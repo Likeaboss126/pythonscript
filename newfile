@@ -646,3 +646,66 @@ def parse_sections(html):
         })
 
     return sections
+
+
+from bs4 import BeautifulSoup
+
+
+def parse_sections(html):
+
+    # Important fix for Confluence macros
+    soup = BeautifulSoup(html, "xml")
+
+    sections = []
+
+    current_heading = "General"
+
+    buffer = []
+
+    elements = soup.find_all([
+        "h1", "h2", "h3", "h4",
+        "p",
+        "li",
+        "ac:parameter"
+    ])
+
+    for element in elements:
+
+        # ----------------------
+        # HEADINGS
+        # ----------------------
+
+        if element.name in ["h1", "h2", "h3", "h4"]:
+
+            if buffer:
+                sections.append({
+                    "heading": current_heading,
+                    "text": "\n".join(buffer)
+                })
+                buffer = []
+
+            current_heading = element.get_text(" ", strip=True)
+
+
+        # ----------------------
+        # TEXT CONTENT
+        # ----------------------
+
+        elif element.name in ["p", "li", "ac:parameter"]:
+
+            text = element.get_text(" ", strip=True)
+
+            # filter empty/noise text
+            if text and len(text) > 3:
+                buffer.append(text)
+
+
+    # flush last section
+    if buffer:
+
+        sections.append({
+            "heading": current_heading,
+            "text": "\n".join(buffer)
+        })
+
+    return sections
