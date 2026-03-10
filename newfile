@@ -552,3 +552,50 @@ if __name__ == "__main__":
         question = input("\nAsk question: ")
 
         search(question)
+
+
+
+
+
+def parse_sections(html):
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    sections = []
+    current_heading = "General"
+    buffer = []
+
+    for element in soup.find_all(["h1","h2","h3","p","li"]):
+
+        if element.name in ["h1","h2","h3"]:
+
+            if buffer:
+                sections.append({
+                    "heading": current_heading,
+                    "text": "\n".join(buffer)
+                })
+                buffer = []
+
+            current_heading = element.get_text(strip=True)
+
+        elif element.name == "p":
+
+            text = element.get_text(" ", strip=True)
+
+            if text:
+                buffer.append(text)
+
+        elif element.name == "li":
+
+            text = element.get_text(" ", strip=True)
+
+            if text:
+                buffer.append("- " + text)
+
+    if buffer:
+        sections.append({
+            "heading": current_heading,
+            "text": "\n".join(buffer)
+        })
+
+    return sections
