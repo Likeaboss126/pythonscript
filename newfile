@@ -1,0 +1,184 @@
+import requests
+import chromadb
+from bs4 import BeautifulSoup
+from chromadb.utils import embedding_functions
+
+# -----------------------------
+# CONFIG
+# -----------------------------
+
+CONFLUENCE_BASE_URL = "https://your-company.atlassian.net/wiki"
+USERNAME = "your_email"
+API_TOKEN = "your_api_token"
+
+# Only ingest these pages (example)
+PAGE_IDS = [
+    "12345678",
+    "23456789",
+    "34567890"
+]
+
+# -----------------------------
+# CHROMA SETUP
+# -----------------------------
+
+embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+    model_name="all-MiniLM-L6-v2"
+)
+
+chroma_client = chromadb.Client(
+    chromadb.config.Settings(
+        persist_directory="./confluence_chroma_db"
+    )
+)
+
+collection = chroma_client.get_or_create_collection(
+    name="confluence_docs",
+    embedding_function=embedding_function
+)
+
+# -----------------------------
+# FETCH CONFLUENCE PAGE
+# -----------------------------
+
+def fetch_page(page_id):
+
+    url = f"{CONFLUENCE_BASE_URL}/rest/api/content/{page_id}?expand=body.storage,version"
+
+    response = requests.get(
+        url,
+        auth=(USERNAME, API_TOKEN)
+    )
+
+    data = response.json()
+
+    title = data["title"]
+    html = data["body"]["storage"]["value"]
+
+    page_url = f"{CONFLUENCE_BASE_URL}/pages/viewpage.action?pageId={page_id}"
+
+    return title, html, page_url
+
+
+# -----------------------------
+# CLEAN HTML
+# -----------------------------
+
+def html_to_text(html):
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    for tag in soup(["script", "style"]):
+        tag.decompose()
+
+    text = soup.get_text("\n")
+
+    return text
+
+
+# -----------------------------
+# SIMPLE CHUNKING
+# -----------------------------
+
+def chunk_text(text, chunk_size=500):
+
+    paragraphs = text.split("\n")
+
+    chunks = []
+    current_chunk = ""
+
+    for para in paragraphs:
+
+        if len(current_chunk) + len(para) < chunk_size:
+            current_chunk += " " + para
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = para
+
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return chunks
+
+
+# -----------------------------
+# INGEST PAGES
+# -----------------------------
+
+def ingest_pages():
+
+    for page_id in PAGE_IDS:
+
+        print(f"Ingesting page {page_id}")
+
+        title, html, page_url = fetch_page(page_id)
+
+        text = html_to_text(html)
+
+        chunks = chunk_text(text)
+
+        documents = []
+        metadatas = []
+        ids = []
+
+        for i, chunk in enumerate(chunks):
+
+            chunk_id = f"{page_id}_{i}"
+
+            documents.append(chunk)
+
+            metadatas.append({
+                "page_id": page_id,
+                "title": title,
+                "chunk_id": chunk_id,
+                "url": page_url
+            })
+
+            ids.append(chunk_id)
+
+        collection.add(
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids
+        )
+
+        print(f"Stored {len(chunks)} chunks")
+
+
+# -----------------------------
+# QUERY FUNCTION
+# -----------------------------
+
+def search(query):
+
+    results = collection.query(
+        query_texts=[query],
+        n_results=3
+    )
+
+    documents = results["documents"][0]
+    metadatas = results["metadatas"][0]
+
+    for doc, meta in zip(documents, metadatas):
+
+        print("\n------ RESULT ------\n")
+
+        print(doc)
+
+        print("\nSource:", meta["title"])
+        print("URL:", meta["url"])
+
+
+# -----------------------------
+# RUN
+# -----------------------------
+
+if __name__ == "__main__":
+
+    ingest_pages()
+
+    while True:
+
+        question = input("\nAsk question: ")
+
+        search(question)
