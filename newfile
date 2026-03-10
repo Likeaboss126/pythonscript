@@ -291,3 +291,36 @@ collection = client.get_or_create_collection(
     name="test_collection",
     embedding_function=embedding_function
 )
+
+
+
+
+current_heading = "General"
+buffer = []
+
+for element in soup.find_all(["h1","h2","h3","p","ul","ol","table"]):
+
+    if element.name in ["h1","h2","h3"]:
+
+        if buffer:
+            chunks.append({
+                "heading": current_heading,
+                "text": "\n".join(buffer)
+            })
+            buffer = []
+
+        current_heading = element.get_text(strip=True)
+
+    elif element.name == "p":
+        buffer.append(element.get_text(strip=True))
+
+    elif element.name in ["ul","ol"]:
+        items = [li.get_text(strip=True) for li in element.find_all("li")]
+        buffer.extend(items)
+
+# last chunk
+if buffer:
+    chunks.append({
+        "heading": current_heading,
+        "text": "\n".join(buffer)
+    })
