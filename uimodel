@@ -123,3 +123,43 @@ if query:
         st.write(meta["url"])
 
         st.write("---")
+
+
+
+
+
+
+# --------------------------
+# UI
+# --------------------------
+
+st.title("Confluence AI Search")
+
+query = st.text_input("Ask a question about documentation")
+
+if query:
+
+    with st.spinner("Searching documentation and generating answer..."):
+
+        context, docs, metas = search_docs(query)
+
+        answer = ask_llm(context, query)
+
+    st.subheader("AI Answer")
+
+    st.write(answer)
+
+    st.subheader("Sources")
+
+    for doc, meta in zip(docs, metas):
+
+        preview = doc[:200]
+
+        st.markdown(f"**Page:** {meta['title']}")
+        st.markdown(f"**Section:** {meta['section_heading']}")
+
+        st.markdown(f"[Open in Confluence]({meta['url']})")
+
+        st.markdown(f"Preview: {preview}")
+
+        st.write("---")
