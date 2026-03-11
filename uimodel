@@ -1,0 +1,125 @@
+import streamlit as st
+import chromadb
+from sentence_transformers import SentenceTransformer
+from chromadb.utils.embedding_functions import EmbeddingFunction
+import requests
+
+
+# --------------------------
+# LOCAL EMBEDDING SETUP
+# --------------------------
+
+LOCAL_MODEL_PATH = "C:/models/bge-small-en"
+
+
+class LocalEmbeddingFunction(EmbeddingFunction):
+
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input):
+        return self.model.encode(input).tolist()
+
+
+model = SentenceTransformer(LOCAL_MODEL_PATH)
+
+embedding_function = LocalEmbeddingFunction(model)
+
+
+# --------------------------
+# LOAD CHROMA DB
+# --------------------------
+
+client = chromadb.PersistentClient(path="./confluence_chroma_db")
+
+collection = client.get_collection(
+    name="confluence_docs",
+    embedding_function=embedding_function
+)
+
+
+# --------------------------
+# LLM CALL (OLLAMA)
+# --------------------------
+
+def ask_llm(context, question):
+
+    prompt = f"""
+You are a documentation assistant for internal Confluence pages.
+
+STRICT RULES:
+1. Only answer using the provided documentation context.
+2. Do NOT invent or assume information.
+3. If the answer cannot be found in the context, say:
+   "I couldn't find the exact information in the documentation."
+4. After that message, show the source links so the user can check manually.
+5. Keep answers short and factual.
+
+Documentation Context:
+{context}
+
+User Question:
+{question}
+
+Give a short helpful answer.
+"""
+
+    response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": "llama3",
+            "prompt": prompt,
+            "stream": False
+        }
+    )
+
+    return response.json()["response"]
+
+
+# --------------------------
+# SEARCH FUNCTION
+# --------------------------
+
+def search_docs(query):
+
+    results = collection.query(
+        query_texts=[query],
+        n_results=3
+    )
+
+    documents = results["documents"][0]
+    metas = results["metadatas"][0]
+
+    context = "\n\n".join(documents)
+
+    return context, documents, metas
+
+
+# --------------------------
+# UI
+# --------------------------
+
+st.title("Confluence AI Search")
+
+query = st.text_input("Ask a question about documentation")
+
+if query:
+
+    context, docs, metas = search_docs(query)
+
+    answer = ask_llm(context, query)
+
+    st.subheader("AI Answer")
+
+    st.write(answer)
+
+    st.subheader("Sources")
+
+    for doc, meta in zip(docs, metas):
+
+        st.write("**Page:**", meta["title"])
+        st.write("**Section:**", meta["section_heading"])
+
+        st.write(meta["url"])
+
+        st.write("---")
