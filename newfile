@@ -808,12 +808,41 @@ for doc, meta in zip(documents, metas):
 
 
 import chromadb
+from chromadb.utils.embedding_functions import EmbeddingFunction
 from sentence_transformers import SentenceTransformer
 
+
+# path to your local embedding model
+LOCAL_MODEL_PATH = "C:/models/bge-small-en"
+
+
+# embedding class
+class LocalEmbeddingFunction(EmbeddingFunction):
+
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input):
+        return self.model.encode(input, batch_size=32).tolist()
+
+
+# load local model
+model = SentenceTransformer(LOCAL_MODEL_PATH)
+
+embedding_function = LocalEmbeddingFunction(model)
+
+
+# open existing database
 client = chromadb.PersistentClient(path="./confluence_chroma_db")
 
-collection = client.get_collection(name="confluence_docs")
 
+collection = client.get_collection(
+    name="confluence_docs",
+    embedding_function=embedding_function
+)
+
+
+# run search
 query = "when refund is allowed"
 
 results = collection.query(
@@ -821,8 +850,10 @@ results = collection.query(
     n_results=3
 )
 
+
 documents = results["documents"][0]
 metas = results["metadatas"][0]
+
 
 for doc, meta in zip(documents, metas):
 
