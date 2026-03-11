@@ -769,3 +769,70 @@ collection = client.get_or_create_collection(
     name="confluence_docs",
     embedding_function=embedding_function
 )
+
+
+
+import chromadb
+
+client = chromadb.PersistentClient(path="./confluence_chroma_db")
+
+collection = client.get_collection(name="confluence_docs")
+
+print("Total vectors stored:", collection.count())
+
+
+import chromadb
+
+client = chromadb.PersistentClient(path="./confluence_chroma_db")
+
+collection = client.get_collection(name="confluence_docs")
+
+data = collection.get(limit=5)
+
+documents = data["documents"]
+metas = data["metadatas"]
+
+for doc, meta in zip(documents, metas):
+
+    print("\n-------------------")
+
+    print("Preview:")
+    print(doc[:200])
+
+    print("\nPage:", meta["title"])
+
+    print("Section:", meta["section_heading"])
+
+    print("URL:", meta["url"])
+
+
+
+import chromadb
+from sentence_transformers import SentenceTransformer
+
+client = chromadb.PersistentClient(path="./confluence_chroma_db")
+
+collection = client.get_collection(name="confluence_docs")
+
+query = "when refund is allowed"
+
+results = collection.query(
+    query_texts=[query],
+    n_results=3
+)
+
+documents = results["documents"][0]
+metas = results["metadatas"][0]
+
+for doc, meta in zip(documents, metas):
+
+    print("\n======================")
+
+    print("Preview:")
+    print(doc[:200])
+
+    print("\nPage:", meta["title"])
+
+    print("Section:", meta["section_heading"])
+
+    print("URL:", meta["url"])
