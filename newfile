@@ -709,3 +709,63 @@ def parse_sections(html):
         })
 
     return sections
+
+
+
+
+
+import chromadb
+from chromadb.utils.embedding_functions import EmbeddingFunction
+from sentence_transformers import SentenceTransformer
+
+
+class LocalEmbeddingFunction(EmbeddingFunction):
+
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input):
+
+        embeddings = self.model.encode(
+            input,
+            batch_size=32,
+            show_progress_bar=False
+        )
+
+        return embeddings.tolist()
+
+
+
+
+import chromadb
+from chromadb.utils.embedding_functions import EmbeddingFunction
+from sentence_transformers import SentenceTransformer
+
+
+# load local embedding model
+model = SentenceTransformer("C:/models/bge-small-en")
+
+
+class LocalEmbeddingFunction(EmbeddingFunction):
+
+    def __init__(self, model):
+        self.model = model
+
+    def __call__(self, input):
+        return self.model.encode(input, batch_size=32).tolist()
+
+
+embedding_function = LocalEmbeddingFunction(model)
+
+
+client = chromadb.Client(
+    chromadb.config.Settings(
+        persist_directory="./confluence_chroma_db"
+    )
+)
+
+
+collection = client.get_or_create_collection(
+    name="confluence_docs",
+    embedding_function=embedding_function
+)
