@@ -1,63 +1,19 @@
-import os
-from atlassian import Confluence
-from langchain_community.document_loaders import ConfluenceLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_ollama import OllamaEmbeddings
-from langchain_chroma import Chroma
+Analyze this codebase and give me a clear breakdown of the tech stack and architecture used.
 
-# --- 1. CONFIGURATION ---
-CONFLUENCE_URL = "https://your-company.atlassian.net/wiki"
-USERNAME = "your-email@company.com"
-API_TOKEN = "your-atlassian-api-token"
-PARENT_PAGE_ID = "123456789"  # The ID of the "Top" page
-DB_PATH = "./local_confluence_db" # Folder where Chroma will save data
+Specifically answer:
 
-# --- 2. GET ALL CHILD PAGES RECURSIVELY ---
-def get_all_page_ids(confluence_api, page_id):
-    """Recursively finds all child page IDs."""
-    ids = [page_id]
-    children = confluence_api.get_child_pages(page_id)
-    for child in children:
-        ids.extend(get_all_page_ids(confluence_api, child['id']))
-    return list(set(ids))
+1. What frontend framework/library is used (React, Next.js, etc.) and how it is structured (SPA, routing setup)?
+2. Is TypeScript used fully or partially? Where is it used?
+3. How is state management handled (Redux, Context, etc.) and to what extent?
+4. How are API calls made (fetch, axios, custom services)? Where are they located?
+5. What build tool is used (Vite, Webpack, etc.) and how is the project structured around it?
+6. What CSS/styling approach is used (plain CSS, modules, Tailwind, styled-components)?
+7. What are the key folders and their responsibilities (components, services, store, etc.)?
+8. Identify any advanced patterns used (custom hooks, HOCs, middleware, etc.)
+9. How scalable or production-ready is this architecture?
 
-print("🔍 Navigating Confluence hierarchy...")
-confluence_api = Confluence(url=CONFLUENCE_URL, username=USERNAME, password=API_TOKEN)
-all_ids = get_all_page_ids(confluence_api, PARENT_PAGE_ID)
-print(f"✅ Found {len(all_ids)} pages (Parent + Children).")
+Explain in simple terms as if I am transitioning from QA to development.
 
-# --- 3. LOAD CONTENT ---
-print("📥 Fetching page content...")
-loader = ConfluenceLoader(
-    url=CONFLUENCE_URL,
-    username=USERNAME,
-    api_key=API_TOKEN
-)
-# Load text from the list of IDs we found
-documents = loader.load(page_ids=all_ids)
 
-# --- 4. CHUNK DATA ---
-# mxbai-embed-large has a 512-token limit (~2000 chars). 
-# We use 800 characters to ensure the model doesn't truncate the meaning.
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800, 
-    chunk_overlap=100,
-    separators=["\n\n", "\n", " ", ""]
-)
-docs = text_splitter.split_documents(documents)
-print(f"✂️ Split {len(documents)} pages into {len(docs)} chunks.")
 
-# --- 5. CREATE VECTOR DB ---
-print(f"🧠 Generating vectors with mxbai-embed-large...")
-
-# Note: mxbai requires a specific prefix for queries, 
-# which we will handle during the search phase.
-embeddings = OllamaEmbeddings(model="mxbai-embed-large")
-
-vector_db = Chroma.from_documents(
-    documents=docs, 
-    embedding=embeddings,
-    persist_directory=DB_PATH
-)
-
-print(f"🎉 Success! Vector DB created locally at: {DB_PATH}")
+Based on this project, what are the most important concepts I should learn to work effectively on this codebase? Prioritize them in order and explain why.
