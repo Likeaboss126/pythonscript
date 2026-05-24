@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<jasperReport
+    xmlns="http://jasperreports.sourceforge.net/jasperreports"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="
+        http://jasperreports.sourceforge.net/jasperreports
+        http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+    name="accessible_report"
+    pageWidth="595"
+    pageHeight="842"
+    columnWidth="515"
+    leftMargin="40"
+    rightMargin="40"
+    topMargin="40"
+    bottomMargin="40"
+    uuid="12345678-1234-1234-1234-123456789012">
+
+    <!-- IMPORTANT PDF ACCESSIBILITY SETTINGS -->
+    <property name="net.sf.jasperreports.export.pdf.tagged" value="true"/>
+    <property name="net.sf.jasperreports.export.pdf.tag.language" value="en-US"/>
+    <property name="net.sf.jasperreports.export.pdf.metadata.title"
+              value="Assets and Liabilities Report"/>
+
+    <!-- PARAMETERS -->
+    <parameter name="CLIENT_NAME" class="java.lang.String"/>
+    <parameter name="REPORT_DATE" class="java.lang.String"/>
+
+    <!-- STYLES -->
+
+    <!-- Small section label -->
+    <style name="SECTION_LABEL"
+           fontName="Helvetica"
+           fontSize="12"
+           isBold="true"/>
+
+    <!-- Main heading -->
+    <style name="MAIN_HEADING"
+           fontName="Helvetica"
+           fontSize="28"
+           isBold="false"/>
+
+    <!-- Normal body text -->
+    <style name="BODY_TEXT"
+           fontName="Helvetica"
+           fontSize="12"/>
+
+    <!-- PAGE CONTENT -->
+    <detail>
+        <band height="200">
+
+            <!-- SECTION LABEL -->
+            <staticText>
+                <reportElement
+                    x="0"
+                    y="0"
+                    width="100"
+                    height="20"/>
+
+                <textElement>
+                    <font size="12" isBold="true"/>
+                </textElement>
+
+                <text><![CDATA[Details]]></text>
+            </staticText>
+
+            <!-- MAIN TITLE -->
+            <staticText>
+                <reportElement
+                    x="0"
+                    y="35"
+                    width="450"
+                    height="40"/>
+
+                <textElement>
+                    <font size="28"/>
+                </textElement>
+
+                <text><![CDATA[
+Your current assets and liabilities
+                ]]></text>
+            </staticText>
+
+            <!-- CLIENT NAME -->
+            <textField>
+                <reportElement
+                    x="420"
+                    y="10"
+                    width="130"
+                    height="20"/>
+
+                <textFieldExpression><![CDATA[
+$P{CLIENT_NAME}
+                ]]></textFieldExpression>
+            </textField>
+
+            <!-- DATE -->
+            <textField>
+                <reportElement
+                    x="420"
+                    y="30"
+                    width="130"
+                    height="20"/>
+
+                <textFieldExpression><![CDATA[
+$P{REPORT_DATE}
+                ]]></textFieldExpression>
+            </textField>
+
+        </band>
+    </detail>
+
+</jasperReport>
