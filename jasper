@@ -111,3 +111,106 @@ $P{REPORT_DATE}
     </detail>
 
 </jasperReport>
+
+
+
+
+
+
+
+
+Analyze all JRXML files in this project and generate an inventory of report components used across reports.
+
+Identify:
+- text fields
+- static text
+- headings
+- tables
+- nested tables
+- charts/graphs
+- images
+- frames
+- subreports
+- lists
+- form-like elements
+- lines/shapes
+- floating elements
+- absolute-positioned layouts
+
+For each component type:
+- list affected JRXML files
+- estimate complexity
+- identify accessibility risks for PDF/UA/WCAG compliance.
+
+
+
+Analyze all JRXML files and identify accessibility risks related to PDF/UA and WCAG compliance.
+
+Focus especially on:
+- nested tables
+- missing semantic heading hierarchy
+- absolute positioning
+- reading-order risks
+- image accessibility risks
+- layout tables vs semantic tables
+- multi-column structures
+- complex frames/subreports
+- potential screen-reader issues
+
+Classify findings as:
+LOW / MEDIUM / HIGH accessibility risk.
+
+
+
+
+Analyze the JRXML files and supporting Java code to identify reusable rendering patterns and common report components.
+
+Find:
+- shared table structures
+- common text/header sections
+- image rendering patterns
+- reusable subreports
+- common styles
+- common layout templates
+
+Suggest which components should be converted into accessibility-safe reusable generators.
+
+
+
+
+Analyze all JRXML files and identify potential heading structures based on:
+- font size
+- bold styling
+- positioning
+- repeated section patterns
+
+Suggest probable H1/H2/H3 semantic hierarchy mappings for accessible PDF generation.
+
+
+
+
+Analyze JRXML layouts for potential reading-order problems in accessible PDF generation.
+
+Focus on:
+- side-by-side elements
+- floating elements
+- nested frames
+- overlapping components
+- absolute positioning
+- subreports
+- multi-column layouts
+
+Explain which layouts may confuse screen readers.
+
+
+
+
+Suggest an accessibility-first redesign strategy for these JRXML reports while minimizing visual changes.
+
+Recommend:
+- semantic heading hierarchy
+- simplified layouts
+- reduced nested table usage
+- accessibility-safe reusable components
+- logical reading order improvements
+- tagged PDF best practices.
