@@ -68,13 +68,11 @@
 
 
 
-
-
 <summary>
     <band height="100" splitType="Stretch">
         
         <frame>
-            <reportElement x="0" y="0" width="555" height="50" uuid="9a8b7c6d-5f4a-3b2c-1d0e-f9a8b7c6d5e4">
+            <reportElement x="0" y="0" width="555" height="50" uuid="bc8a31de-4091-4cfa-8172-ef0e4c8491bb">
                 <property name="net.sf.jasperreports.export.pdf.tag.table" value="full"/>
             </reportElement>
 
@@ -106,7 +104,7 @@
                 </textField>
                 
                 <textField>
-                    <reportElement x="350" y="0" width="205" height="20" uuid="3c4d5e6f-7a8b-9c0d-1e2f3a4b5c6d">
+                    <reportElement x="350" y="0" width="205" height="20" uuid="a4f3b2c1-d0e1-4f8a-9b7c-6d5e4f3a2b1c">
                         <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
                         <property name="net.sf.jasperreports.export.pdf.tag.column.index" value="2"/>
                     </reportElement>
@@ -155,6 +153,10 @@
                     <textFieldExpression><![CDATA["Developer"]]></textFieldExpression>
                 </textField>
             </frame>
+
+        </frame> </band>
+</summary>
+
 
         </frame> </band>
 </summary>
