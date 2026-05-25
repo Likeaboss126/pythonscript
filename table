@@ -121,3 +121,23 @@
         </textField>
     </frame>
 </frame>
+
+
+
+<textField>
+    <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+    <property name="net.sf.jasperreports.export.pdf.tag.th.scope" value="col"/>
+    
+    <reportElement x="0" y="0" width="185" height="20"/>
+    <textElement textAlignment="Center" verticalAlignment="Middle">
+        <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+    </textElement>
+    <textFieldExpression><![CDATA["ID"]]></textFieldExpression>
+</textField>
+
+
+
+Column	Header Cell Geometry	Data Cell Geometry
+Column 1	x="0" width="185"	x="0" width="185"
+Column 2	x="185" width="185"	x="185" width="185"
+Column 3	x="370" width="185"	x="370" width="185"
