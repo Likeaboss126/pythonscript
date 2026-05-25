@@ -1,81 +1,76 @@
 <summary>
-        <band height="100" splitType="Stretch">
-            <componentElement>
-                <reportElement x="0" y="0" width="555" height="80" uuid="table_comp_element_001"/>
-                <jr:table>
-                    <datasetRun subDataset="empty_dataset" uuid="dataset_run_001">
-                        <dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.JREmptyDataSource(3)]]></dataSourceExpression>
-                    </datasetRun>
+    <band height="100" splitType="Stretch">
+        <componentElement>
+            <reportElement x="0" y="0" width="555" height="80" uuid="7a3c1e4d-8b2f-4a6c-9d0e-1f2a3b4c5d6e"/>
+            <jr:table>
+                <datasetRun subDataset="empty_dataset" uuid="9b8c7d6e-5f4a-3b2c-1d0e-f9a8b7c6d5e4">
+                    <dataSourceExpression><![CDATA[new net.sf.jasperreports.engine.JREmptyDataSource(3)]]></dataSourceExpression>
+                </datasetRun>
 
-                    <jr:column width="100" uuid="col_structure_id">
-                        <jr:columnHeader height="20" rowSpan="1">
-                            <textField>
-                                <reportElement x="0" y="0" width="100" height="20" uuid="th_txt_id"/>
-                                <textElement textAlignment="Left" verticalAlignment="Middle">
-                                    <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
-                                </textElement>
-                                <textFieldExpression><![CDATA["ID"]]></textFieldExpression>
-                            </textField>
-                        </jr:columnHeader>
-                        <jr:detailCell height="20" rowSpan="1">
-                            <textField>
-                                <reportElement x="0" y="0" width="100" height="20" uuid="td_txt_id"/>
-                                <textElement verticalAlignment="Middle">
-                                    <font pdfEmbedded="true" pdfEncoding="Identity-H"/>
-                                </textElement>
-                                <textFieldExpression><![CDATA[$V{REPORT_COUNT} == 1 ? "101" : ($V{REPORT_COUNT} == 2 ? "102" : "103")]]></textFieldExpression>
-                            </textField>
-                        </jr:detailCell>
-                    </jr:column>
+                <jr:column width="100" uuid="3d2c1b0a-f9e8-4d7c-bcba-9876543210ab">
+                    <jr:columnHeader height="20" rowSpan="1">
+                        <textField>
+                            <reportElement x="0" y="0" width="100" height="20" uuid="1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"/>
+                            <textElement textAlignment="Left" verticalAlignment="Middle">
+                                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                            </textElement>
+                            <textFieldExpression><![CDATA["ID"]]></textFieldExpression>
+                        </textField>
+                    </jr:columnHeader>
+                    <jr:detailCell height="20" rowSpan="1">
+                        <textField>
+                            <reportElement x="0" y="0" width="100" height="20" uuid="2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e"/>
+                            <textElement verticalAlignment="Middle">
+                                <font pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                            </textElement>
+                            <textFieldExpression><![CDATA[$V{REPORT_COUNT} == 1 ? "101" : ($V{REPORT_COUNT} == 2 ? "102" : "103")]]></textFieldExpression>
+                        </textField>
+                    </jr:detailCell>
+                </jr:column>
 
-                    <jr:column width="250" uuid="col_structure_name">
-                        <jr:columnHeader height="20" rowSpan="1">
-                            <textField>
-                                <reportElement x="0" y="0" width="250" height="20" uuid="th_txt_name"/>
-                                <textElement textAlignment="Left" verticalAlignment="Middle">
-                                    <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
-                                </textElement>
-                                <textFieldExpression><![CDATA["Name"]]></textFieldExpression>
-                            </textField>
-                        </jr:columnHeader>
-                        <jr:detailCell height="20" rowSpan="1">
-                            <textField>
-                                <reportElement x="0" y="0" width="250" height="20" uuid="td_txt_name"/>
-                                <textElement verticalAlignment="Middle">
-                                    <font pdfEmbedded="true" pdfEncoding="Identity-H"/>
-                                </textElement>
-                                <textFieldExpression><![CDATA[$V{REPORT_COUNT} == 1 ? "Alice Smith" : ($V{REPORT_COUNT} == 2 ? "Bob Jones" : "Charlie Brown")]]></textFieldExpression>
-                            </textField>
-                        </jr:detailCell>
-                    </jr:column>
+                <jr:column width="250" uuid="4e3d2c1b-0a9f-8e7d-cbba-876543210abc">
+                    <jr:columnHeader height="20" rowSpan="1">
+                        <textField>
+                            <reportElement x="0" y="0" width="250" height="20" uuid="3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f"/>
+                            <textElement textAlignment="Left" verticalAlignment="Middle">
+                                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                            </textElement>
+                            <textFieldExpression><![CDATA["Name"]]></textFieldExpression>
+                        </textField>
+                    </jr:columnHeader>
+                    <jr:detailCell height="20" rowSpan="1">
+                        <textField>
+                            <reportElement x="0" y="0" width="250" height="20" uuid="4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a"/>
+                            <textElement verticalAlignment="Middle">
+                                <font pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                            </textElement>
+                            <textFieldExpression><![CDATA[$V{REPORT_COUNT} == 1 ? "Alice Smith" : ($V{REPORT_COUNT} == 2 ? "Bob Jones" : "Charlie Brown")]]></textFieldExpression>
+                        </textField>
+                    </jr:detailCell>
+                </jr:column>
 
-                    <jr:column width="205" uuid="col_structure_role">
-                        <jr:columnHeader height="20" rowSpan="1">
-                            <textField>
-                                <reportElement x="0" y="0" width="205" height="20" uuid="th_txt_role"/>
-                                <textElement textAlignment="Left" verticalAlignment="Middle">
-                                    <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
-                                </textElement>
-                                <textFieldExpression><![CDATA["Role"]]></textFieldExpression>
-                            </textField>
-                        </jr:columnHeader>
-                        <jr:detailCell height="20" rowSpan="1">
-                            <textField>
-                                <reportElement x="0" y="0" width="205" height="20" uuid="td_txt_role"/>
-                                <textElement verticalAlignment="Middle">
-                                    <font pdfEmbedded="true" pdfEncoding="Identity-H"/>
-                                </textElement>
-                                <textFieldExpression><![CDATA[$V{REPORT_COUNT} == 1 ? "Developer" : ($V{REPORT_COUNT} == 2 ? "QA Tester" : "Manager")]]></textFieldExpression>
-                            </textField>
-                        </jr:detailCell>
-                    </jr:column>
+                <jr:column width="205" uuid="5f4e3d2c-1a0b-9f8e-cbba-76543210abcd">
+                    <jr:columnHeader height="20" rowSpan="1">
+                        <textField>
+                            <reportElement x="0" y="0" width="205" height="20" uuid="5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b"/>
+                            <textElement textAlignment="Left" verticalAlignment="Middle">
+                                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                            </textElement>
+                            <textFieldExpression><![CDATA["Role"]]></textFieldExpression>
+                        </textField>
+                    </jr:columnHeader>
+                    <jr:detailCell height="20" rowSpan="1">
+                        <textField>
+                            <reportElement x="0" y="0" width="205" height="20" uuid="6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c"/>
+                            <textElement verticalAlignment="Middle">
+                                <font pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                            </textElement>
+                            <textFieldExpression><![CDATA[$V{REPORT_COUNT} == 1 ? "Developer" : ($V{REPORT_COUNT} == 2 ? "QA Tester" : "Manager")]]></textFieldExpression>
+                        </textField>
+                    </jr:detailCell>
+                </jr:column>
 
-                </jr:table>
-            </componentElement>
-
-
-
-
-<subDataset name="empty_dataset" uuid="d1e2f3a4-b5c6-7a8b-9c0d-1e2f3a4b5c6d">
-        <queryString><![CDATA[]]></queryString>
-    </subDataset>
+            </jr:table>
+        </componentElement>
+    </band>
+</summary>
