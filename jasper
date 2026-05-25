@@ -214,3 +214,145 @@ Recommend:
 - accessibility-safe reusable components
 - logical reading order improvements
 - tagged PDF best practices.
+
+
+
+
+
+<componentElement>
+    
+    <reportElement
+        x="0"
+        y="250"
+        width="400"
+        height="90"/>
+
+    <jr:table xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components"
+              xsi:schemaLocation="
+              http://jasperreports.sourceforge.net/jasperreports/components
+              http://jasperreports.sourceforge.net/xsd/components.xsd">
+
+        <!-- DATASET -->
+        <datasetRun subDataset="TableDataset">
+            <dataSourceExpression><![CDATA[
+                new net.sf.jasperreports.engine.JREmptyDataSource(2)
+            ]]></dataSourceExpression>
+        </datasetRun>
+
+        <!-- COLUMN 1 -->
+        <jr:column width="200">
+
+            <!-- HEADER -->
+            <jr:columnHeader height="25">
+
+                <staticText>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="200"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TH"/>
+
+                    </reportElement>
+
+                    <textElement textAlignment="Center">
+                        <font isBold="true"/>
+                    </textElement>
+
+                    <text><![CDATA[Asset Type]]></text>
+
+                </staticText>
+
+            </jr:columnHeader>
+
+            <!-- DETAIL -->
+            <jr:detailCell height="25">
+
+                <textField>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="200"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TD"/>
+
+                    </reportElement>
+
+                    <textFieldExpression><![CDATA[
+                        $V{REPORT_COUNT} == 1 ?
+                        "Savings" :
+                        "Mutual Funds"
+                    ]]></textFieldExpression>
+
+                </textField>
+
+            </jr:detailCell>
+
+        </jr:column>
+
+        <!-- COLUMN 2 -->
+        <jr:column width="200">
+
+            <!-- HEADER -->
+            <jr:columnHeader height="25">
+
+                <staticText>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="200"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TH"/>
+
+                    </reportElement>
+
+                    <textElement textAlignment="Center">
+                        <font isBold="true"/>
+                    </textElement>
+
+                    <text><![CDATA[Amount]]></text>
+
+                </staticText>
+
+            </jr:columnHeader>
+
+            <!-- DETAIL -->
+            <jr:detailCell height="25">
+
+                <textField>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="200"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TD"/>
+
+                    </reportElement>
+
+                    <textFieldExpression><![CDATA[
+                        $V{REPORT_COUNT} == 1 ?
+                        "10000" :
+                        "25000"
+                    ]]></textFieldExpression>
+
+                </textField>
+
+            </jr:detailCell>
+
+        </jr:column>
+
+    </jr:table>
+
+</componentElement>
