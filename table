@@ -1,0 +1,198 @@
+<subDataset name="TableDataset"/>
+
+
+<componentElement>
+
+    <reportElement
+        x="0"
+        y="250"
+        width="450"
+        height="120"/>
+
+    <jr:table
+        xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components">
+
+        <datasetRun subDataset="TableDataset">
+            <dataSourceExpression><![CDATA[
+                new net.sf.jasperreports.engine.JREmptyDataSource(3)
+            ]]></dataSourceExpression>
+        </datasetRun>
+
+        <!-- COLUMN 1 -->
+        <jr:column width="150">
+
+            <!-- HEADER -->
+            <jr:columnHeader height="25">
+
+                <staticText>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="150"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TH"/>
+
+                    </reportElement>
+
+                    <textElement textAlignment="Center">
+                        <font isBold="true"/>
+                    </textElement>
+
+                    <text><![CDATA[Asset Type]]></text>
+
+                </staticText>
+
+            </jr:columnHeader>
+
+            <!-- ROW DATA -->
+            <jr:detailCell height="25">
+
+                <textField>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="150"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TD"/>
+
+                    </reportElement>
+
+                    <textFieldExpression><![CDATA[
+                        $V{REPORT_COUNT} == 1 ? "Savings" :
+                        $V{REPORT_COUNT} == 2 ? "Mutual Funds" :
+                        "Fixed Deposit"
+                    ]]></textFieldExpression>
+
+                </textField>
+
+            </jr:detailCell>
+
+        </jr:column>
+
+        <!-- COLUMN 2 -->
+        <jr:column width="150">
+
+            <!-- HEADER -->
+            <jr:columnHeader height="25">
+
+                <staticText>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="150"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TH"/>
+
+                    </reportElement>
+
+                    <textElement textAlignment="Center">
+                        <font isBold="true"/>
+                    </textElement>
+
+                    <text><![CDATA[Amount]]></text>
+
+                </staticText>
+
+            </jr:columnHeader>
+
+            <!-- ROW DATA -->
+            <jr:detailCell height="25">
+
+                <textField>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="150"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TD"/>
+
+                    </reportElement>
+
+                    <textFieldExpression><![CDATA[
+                        $V{REPORT_COUNT} == 1 ? "10000" :
+                        $V{REPORT_COUNT} == 2 ? "25000" :
+                        "5000"
+                    ]]></textFieldExpression>
+
+                </textField>
+
+            </jr:detailCell>
+
+        </jr:column>
+
+        <!-- COLUMN 3 -->
+        <jr:column width="150">
+
+            <!-- HEADER -->
+            <jr:columnHeader height="25">
+
+                <staticText>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="150"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TH"/>
+
+                    </reportElement>
+
+                    <textElement textAlignment="Center">
+                        <font isBold="true"/>
+                    </textElement>
+
+                    <text><![CDATA[Status]]></text>
+
+                </staticText>
+
+            </jr:columnHeader>
+
+            <!-- ROW DATA -->
+            <jr:detailCell height="25">
+
+                <textField>
+                    <reportElement
+                        x="0"
+                        y="0"
+                        width="150"
+                        height="25">
+
+                        <property
+                            name="net.sf.jasperreports.export.pdf.tag"
+                            value="TD"/>
+
+                    </reportElement>
+
+                    <textFieldExpression><![CDATA[
+                        $V{REPORT_COUNT} == 1 ? "Active" :
+                        $V{REPORT_COUNT} == 2 ? "Growing" :
+                        "Locked"
+                    ]]></textFieldExpression>
+
+                </textField>
+
+            </jr:detailCell>
+
+        </jr:column>
+
+    </jr:table>
+
+</componentElement>
+
+
+
+xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components"
