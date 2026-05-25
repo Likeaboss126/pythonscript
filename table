@@ -64,3 +64,21 @@
         </componentElement>
     </band>
 </summary>
+
+
+
+
+<summary>
+    <band height="100" splitType="Stretch">
+        
+        <componentElement>
+            <reportElement x="0" y="0" width="555" height="80" uuid="table_wrapper_id"/>
+            
+            <jr:table xmlns:jr="http://jasperreports.sourceforge.net/jasperreports/components" 
+                      xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports/components http://jasperreports.sourceforge.net/xsd/components.xsd">
+                
+                </jr:table>
+        </componentElement>
+        
+    </band>
+</summary>
