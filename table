@@ -1,83 +1,123 @@
-<!-- HEADER 1 -->
-<staticText>
-    <reportElement x="0" y="250" width="150" height="25">
-        <property
-            name="net.sf.jasperreports.export.pdf.tag"
-            value="TH"/>
-    </reportElement>
+<!-- ================================================================= -->
+<!-- THE TABLE CONTAINER (<Table>)                                    -->
+<!-- ================================================================= -->
+<frame>
+    <reportElement x="0" y="0" width="555" height="80"/>
+    <property name="net.sf.jasperreports.export.pdf.tag.table" value="full"/>
+    
+    <!-- ========================================== -->
+    <!-- ROW 1: TABLE HEADER (<TR>)                -->
+    <!-- ========================================== -->
+    <frame>
+        <reportElement x="0" y="0" width="555" height="20"/>
+        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
+        
+        <textField>
+            <reportElement x="0" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+            <textElement textAlignment="Center" verticalAlignment="Middle">
+                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+            </textElement>
+            <textFieldExpression><![CDATA["ID"]]></textFieldExpression>
+        </textField>
+        
+        <textField>
+            <reportElement x="185" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+            <textElement textAlignment="Center" verticalAlignment="Middle">
+                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+            </textElement>
+            <textFieldExpression><![CDATA["Name"]]></textFieldExpression>
+        </textField>
+        
+        <textField>
+            <reportElement x="370" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+            <textElement textAlignment="Center" verticalAlignment="Middle">
+                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+            </textElement>
+            <textFieldExpression><![CDATA["Role"]]></textFieldExpression>
+        </textField>
+    </frame>
 
-    <textElement textAlignment="Center">
-        <font isBold="true"/>
-    </textElement>
+    <!-- ========================================== -->
+    <!-- ROW 2: DATA ROW 1 (<TR>)                   -->
+    <!-- ========================================== -->
+    <frame>
+        <reportElement x="0" y="20" width="555" height="20"/>
+        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
+        
+        <textField>
+            <reportElement x="0" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["101"]]></textFieldExpression>
+        </textField>
+        <textField>
+            <reportElement x="185" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["Alice Smith"]]></textFieldExpression>
+        </textField>
+        <textField>
+            <reportElement x="370" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["Developer"]]></textFieldExpression>
+        </textField>
+    </frame>
 
-    <text><![CDATA[Asset Type]]></text>
-</staticText>
+    <!-- ========================================== -->
+    <!-- ROW 3: DATA ROW 2 (<TR>)                   -->
+    <!-- ========================================== -->
+    <frame>
+        <reportElement x="0" y="40" width="555" height="20"/>
+        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
+        
+        <textField>
+            <reportElement x="0" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["102"]]></textFieldExpression>
+        </textField>
+        <textField>
+            <reportElement x="185" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["Bob Jones"]]></textFieldExpression>
+        </textField>
+        <textField>
+            <reportElement x="370" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["QA Tester"]]></textFieldExpression>
+        </textField>
+    </frame>
 
-<!-- HEADER 2 -->
-<staticText>
-    <reportElement x="150" y="250" width="150" height="25">
-        <property
-            name="net.sf.jasperreports.export.pdf.tag"
-            value="TH"/>
-    </reportElement>
-
-    <textElement textAlignment="Center">
-        <font isBold="true"/>
-    </textElement>
-
-    <text><![CDATA[Amount]]></text>
-</staticText>
-
-<!-- HEADER 3 -->
-<staticText>
-    <reportElement x="300" y="250" width="150" height="25">
-        <property
-            name="net.sf.jasperreports.export.pdf.tag"
-            value="TH"/>
-    </reportElement>
-
-    <textElement textAlignment="Center">
-        <font isBold="true"/>
-    </textElement>
-
-    <text><![CDATA[Status]]></text>
-</staticText>
-
-
-
-<detail>
-    <band height="400">
-
-        <!-- staticText table here -->
-
-    </band>
-</detail>
-
-
-
-<staticText>
-    <reportElement x="0" y="275" width="150" height="25">
-        <property
-            name="net.sf.jasperreports.export.pdf.tag"
-            value="TD"/>
-    </reportElement>
-    <text><![CDATA[Savings]]></text>
-</staticText>
-
-<staticText>
-    <reportElement x="150" y="275" width="150" height="25">
-        <property
-            name="net.sf.jasperreports.export.pdf.tag"
-            value="TD"/>
-    </reportElement>
-    <text><![CDATA[10000]]></text>
-</staticText>
-
-<staticText>
-    <reportElement x="300" y="275" width="150" height="25">
-        <property
-            name="net.sf.jasperreports.export.pdf.tag"
-            value="TD"/>
-    </reportElement>
-    <text><![CDATA[Active]]></text>
-</staticText>
+    <!-- ========================================== -->
+    <!-- ROW 4: DATA ROW 3 (<TR>)                   -->
+    <!-- ========================================== -->
+    <frame>
+        <reportElement x="0" y="60" width="555" height="20"/>
+        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
+        
+        <textField>
+            <reportElement x="0" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["103"]]></textFieldExpression>
+        </textField>
+        <textField>
+            <reportElement x="185" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["Charlie Brown"]]></textFieldExpression>
+        </textField>
+        <textField>
+            <reportElement x="370" y="0" width="185" height="20"/>
+            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+            <textFieldExpression><![CDATA["Manager"]]></textFieldExpression>
+        </textField>
+    </frame>
+</frame>
