@@ -1,143 +1,95 @@
-<!-- ================================================================= -->
-<!-- THE TABLE CONTAINER (<Table>)                                    -->
-<!-- ================================================================= -->
-<frame>
-    <reportElement x="0" y="0" width="555" height="80"/>
-    <property name="net.sf.jasperreports.export.pdf.tag.table" value="full"/>
-    
-    <!-- ========================================== -->
-    <!-- ROW 1: TABLE HEADER (<TR>)                -->
-    <!-- ========================================== -->
-    <frame>
-        <reportElement x="0" y="0" width="555" height="20"/>
-        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
-        
-        <textField>
-            <reportElement x="0" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
-            <textElement textAlignment="Center" verticalAlignment="Middle">
-                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
-            </textElement>
-            <textFieldExpression><![CDATA["ID"]]></textFieldExpression>
-        </textField>
-        
-        <textField>
-            <reportElement x="185" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
-            <textElement textAlignment="Center" verticalAlignment="Middle">
-                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
-            </textElement>
-            <textFieldExpression><![CDATA["Name"]]></textFieldExpression>
-        </textField>
-        
-        <textField>
-            <reportElement x="370" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
-            <textElement textAlignment="Center" verticalAlignment="Middle">
-                <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
-            </textElement>
-            <textFieldExpression><![CDATA["Role"]]></textFieldExpression>
-        </textField>
-    </frame>
+<summary>
+    <band height="80" splitType="Stretch">
+        <frame>
+            <property name="net.sf.jasperreports.export.pdf.tag.table" value="full"/>
+            <reportElement x="0" y="0" width="555" height="80" uuid="table_root_frame"/>
+            
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+                <property name="net.sf.jasperreports.export.pdf.tag.th.scope" value="col"/>
+                <reportElement x="0" y="0" width="185" height="20" uuid="hdr_id"/>
+                <textElement textAlignment="Left" verticalAlignment="Middle">
+                    <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                </textElement>
+                <textFieldExpression><![CDATA["ID"]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+                <property name="net.sf.jasperreports.export.pdf.tag.th.scope" value="col"/>
+                <reportElement x="185" y="0" width="185" height="20" uuid="hdr_name"/>
+                <textElement textAlignment="Left" verticalAlignment="Middle">
+                    <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                </textElement>
+                <textFieldExpression><![CDATA["Name"]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+                <property name="net.sf.jasperreports.export.pdf.tag.th.scope" value="col"/>
+                <reportElement x="370" y="0" width="185" height="20" uuid="hdr_role"/>
+                <textElement textAlignment="Left" verticalAlignment="Middle">
+                    <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
+                </textElement>
+                <textFieldExpression><![CDATA["Role"]]></textFieldExpression>
+            </textField>
 
-    <!-- ========================================== -->
-    <!-- ROW 2: DATA ROW 1 (<TR>)                   -->
-    <!-- ========================================== -->
-    <frame>
-        <reportElement x="0" y="20" width="555" height="20"/>
-        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
-        
-        <textField>
-            <reportElement x="0" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["101"]]></textFieldExpression>
-        </textField>
-        <textField>
-            <reportElement x="185" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["Alice Smith"]]></textFieldExpression>
-        </textField>
-        <textField>
-            <reportElement x="370" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["Developer"]]></textFieldExpression>
-        </textField>
-    </frame>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="0" y="20" width="185" height="20" uuid="row1_c1"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["101"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="185" y="20" width="185" height="20" uuid="row1_c2"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["Alice Smith"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="370" y="20" width="185" height="20" uuid="row1_c3"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["Developer"]]></textFieldExpression>
+            </textField>
 
-    <!-- ========================================== -->
-    <!-- ROW 3: DATA ROW 2 (<TR>)                   -->
-    <!-- ========================================== -->
-    <frame>
-        <reportElement x="0" y="40" width="555" height="20"/>
-        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
-        
-        <textField>
-            <reportElement x="0" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["102"]]></textFieldExpression>
-        </textField>
-        <textField>
-            <reportElement x="185" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["Bob Jones"]]></textFieldExpression>
-        </textField>
-        <textField>
-            <reportElement x="370" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["QA Tester"]]></textFieldExpression>
-        </textField>
-    </frame>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="0" y="40" width="185" height="20" uuid="row2_c1"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["102"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="185" y="40" width="185" height="20" uuid="row2_c2"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["Bob Jones"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="370" y="40" width="185" height="20" uuid="row2_c3"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["QA Tester"]]></textFieldExpression>
+            </textField>
 
-    <!-- ========================================== -->
-    <!-- ROW 4: DATA ROW 3 (<TR>)                   -->
-    <!-- ========================================== -->
-    <frame>
-        <reportElement x="0" y="60" width="555" height="20"/>
-        <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
-        
-        <textField>
-            <reportElement x="0" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["103"]]></textFieldExpression>
-        </textField>
-        <textField>
-            <reportElement x="185" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["Charlie Brown"]]></textFieldExpression>
-        </textField>
-        <textField>
-            <reportElement x="370" y="0" width="185" height="20"/>
-            <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
-            <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
-            <textFieldExpression><![CDATA["Manager"]]></textFieldExpression>
-        </textField>
-    </frame>
-</frame>
-
-
-
-<textField>
-    <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
-    <property name="net.sf.jasperreports.export.pdf.tag.th.scope" value="col"/>
-    
-    <reportElement x="0" y="0" width="185" height="20"/>
-    <textElement textAlignment="Center" verticalAlignment="Middle">
-        <font isBold="true" pdfEmbedded="true" pdfEncoding="Identity-H"/>
-    </textElement>
-    <textFieldExpression><![CDATA["ID"]]></textFieldExpression>
-</textField>
-
-
-
-Column	Header Cell Geometry	Data Cell Geometry
-Column 1	x="0" width="185"	x="0" width="185"
-Column 2	x="185" width="185"	x="185" width="185"
-Column 3	x="370" width="185"	x="370" width="185"
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="0" y="60" width="185" height="20" uuid="row3_c1"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["103"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="185" y="60" width="185" height="20" uuid="row3_c2"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["Charlie Brown"]]></textFieldExpression>
+            </textField>
+            <textField>
+                <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                <reportElement x="370" y="60" width="185" height="20" uuid="row3_c3"/>
+                <textElement verticalAlignment="Middle"><font pdfEmbedded="true" pdfEncoding="Identity-H"/></textElement>
+                <textFieldExpression><![CDATA["Manager"]]></textFieldExpression>
+            </textField>
+        </frame>
+    </band>
+</summary>
