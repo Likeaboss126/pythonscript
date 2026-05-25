@@ -52,3 +52,32 @@
 
     </band>
 </detail>
+
+
+
+<staticText>
+    <reportElement x="0" y="275" width="150" height="25">
+        <property
+            name="net.sf.jasperreports.export.pdf.tag"
+            value="TD"/>
+    </reportElement>
+    <text><![CDATA[Savings]]></text>
+</staticText>
+
+<staticText>
+    <reportElement x="150" y="275" width="150" height="25">
+        <property
+            name="net.sf.jasperreports.export.pdf.tag"
+            value="TD"/>
+    </reportElement>
+    <text><![CDATA[10000]]></text>
+</staticText>
+
+<staticText>
+    <reportElement x="300" y="275" width="150" height="25">
+        <property
+            name="net.sf.jasperreports.export.pdf.tag"
+            value="TD"/>
+    </reportElement>
+    <text><![CDATA[Active]]></text>
+</staticText>
