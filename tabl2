@@ -154,9 +154,7 @@ public class PdfBoxArtifactFixer {
     private static final List<String> PEN_START = Arrays.asList("m", "re");
     private static final List<String> PEN_END = Arrays.asList("s", "S", "f", "F", "b", "B");
 
-    public static byte[] fixSinglePage(byte[] rawPdf) throws IOException {
-        try (PDDocument document = PDDocument.load(rawPdf)) {
-            PDPage page = document.getPage(0);
+   PDPage page = document.getPage(0);
             PDFStreamParser parser = new PDFStreamParser(page);
             
             List<Object> tokens = new ArrayList<>();
@@ -167,59 +165,24 @@ public class PdfBoxArtifactFixer {
             }
 
             List<Object> newTokens = new ArrayList<>();
-            int i = 0;
-            int totalTokens = tokens.size();
 
-            while (i < totalTokens) {
-                Object current = tokens.get(i);
+            for (Object current : tokens) {
+                if (current instanceof Operator op) {
+                    String name = op.getName();
 
-                if (current instanceof Operator op && PEN_START.contains(op.getName())) {
-                    int coordStartIndex = i;
-                    while (coordStartIndex > 0 && !(tokens.get(coordStartIndex - 1) instanceof Operator)) {
-                        coordStartIndex--;
+                    if (PEN_OPERATORS.contains(name)) {
+                        // 🛠️ FIX: Drop the pen operator completely from the stream.
+                        // This prevents Jasper's borders from triggering PAC errors.
+                        continue; 
                     }
-
-                    List<Object> coordinates = new ArrayList<>(newTokens.subList(coordStartIndex, newTokens.size()));
-                    newTokens.subList(coordStartIndex, newTokens.size()).clear();
-
-                    // 🛠️ FIX: Create an explicit, valid layout properties dictionary
-                    COSDictionary artifactProps = new COSDictionary();
-                    artifactProps.setName(COSName.TYPE, "Artifact");
-
-                    // Inject the two explicit operands followed by BDC
-                    newTokens.add(COSName.ARTIFACT);    // Operand 1: /Artifact
-                    newTokens.add(artifactProps);       // Operand 2: << /Type /Artifact >>
-                    newTokens.add(Operator.getOperator("BDC"));
-
-                    newTokens.addAll(coordinates);
-                    newTokens.add(current);
-                    i++;
-
-                    while (i < totalTokens) {
-                        Object innerToken = tokens.get(i);
-                        newTokens.add(innerToken);
-                        i++;
-
-                        if (innerToken instanceof Operator innerOp && PEN_END.contains(innerOp.getName())) {
-                            newTokens.add(Operator.getOperator("EMC"));
-                            break;
-                        }
-                    }
-                } else {
-                    newTokens.add(current);
-                    i++;
                 }
+                newTokens.add(current);
             }
 
+            // Write back the completely safe token stream
             PDStream updatedStream = new PDStream(document);
             try (OutputStream os = updatedStream.createOutputStream()) {
                 new ContentStreamWriter(os).writeTokens(newTokens);
             }
             page.setContents(updatedStream);
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            document.save(baos);
-            return baos.toByteArray();
-        }
-    }
 }
