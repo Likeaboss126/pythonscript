@@ -6,7 +6,7 @@
     <style>
         @page {
             size: A4 landscape;
-            margin: 15mm; /* Slightly smaller margin to give the wide table breathing room */
+            margin: 15mm;
         }
 
         body {
@@ -16,75 +16,97 @@
             background-color: #ffffff;
         }
 
-        /* --- Header Layout Styles --- */
-        .header-container {
+        /* --- Structural Presentation Layout Styling --- */
+        .layout-table {
             width: 100%;
+            border-collapse: collapse;
             margin-bottom: 30px;
+            border: none;
         }
-        .left-column { float: left; width: 65%; }
-        .right-column { float: right; width: 30%; text-align: right; padding-top: 15px; }
-        .clear { clear: both; }
-        .header-context { font-size: 11px; font-weight: bold; color: #555555; margin-bottom: 5px; }
-        h1 { font-size: 26px; font-weight: normal; margin: 0; color: #222222; }
-        .meta-text { font-size: 13px; font-weight: bold; margin: 0; }
-        .meta-date { font-size: 12px; color: #555555; margin-top: 2px; }
 
-        /* --- WCAG Compliant Financial Data Table Styles --- */
+        .layout-table td {
+            padding: 0;
+            vertical-align: top;
+            border: none;
+        }
+
+        .left-align-cell {
+            width: 65%;
+            text-align: left;
+        }
+
+        .right-align-cell {
+            width: 35%;
+            text-align: right;
+            padding-top: 15px; /* Visual baseline alignment */
+        }
+
+        /* --- Header Text Styles --- */
+        .header-context { 
+            font-size: 11px; 
+            font-weight: bold; 
+            color: #555555; 
+            margin: 0 0 5px 0; 
+        }
+        
+        h1 { 
+            font-size: 26px; 
+            font-weight: normal; 
+            margin: 0; 
+            color: #222222; 
+        }
+        
+        .meta-text { 
+            font-size: 13px; 
+            font-weight: bold; 
+            margin: 0; 
+        }
+        
+        .meta-date { 
+            font-size: 12px; 
+            color: #555555; 
+            margin: 2px 0 0 0; 
+        }
+
+        /* --- Financial Data Matrix Styles --- */
         .financial-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 12px;
-            margin-top: 10px;
         }
-
-        /* Top solid border matching the style in the image */
-        .financial-table thead tr {
-            border-top: 2px solid #111111;
-            border-bottom: 1px solid #cccccc;
-        }
-
-        .financial-table th {
-            font-weight: bold;
+        
+        .financial-table thead th {
             color: #111111;
-            padding: 8px 4px;
+            padding: 10px 4px;
             text-align: right;
+            border-bottom: 4px solid #222222; /* Thick column header line */
         }
-
-        /* Left-align the primary metric descriptor column */
-        .financial-table th.metric-column, 
+        
+        .financial-table th.metric-column,
         .financial-table td.metric-column {
             text-align: left;
-            width: 30%; /* Gives the long names plenty of space */
         }
-
+        
         .financial-table td {
             padding: 8px 4px;
-            color: #333333;
-            text-align: right;
-            border-bottom: 1px solid #f0f0f0; /* Soft separator between rows */
-        }
-
-        /* Style for the decorative text icons */
-        .icon-fallback {
-            display: inline-block;
-            margin-right: 5px;
-            color: #555555;
+            border-bottom: 1px solid #e0e0e0;
         }
     </style>
 </head>
 <body>
 
-    <div class="header-container">
-        <div class="left-column">
-            <div class="header-context">Details</div>
-            <h1 th:text="${titleText}">Your current assets and liabilities</h1>
-        </div>
-        <div class="right-column">
-            <p class="meta-text" th:text="${clientName}">M. and J. Vollenweider</p>
-            <div class="meta-date" th:text="${reportDate}">22 May 2026</div>
-        </div>
-        <div class="clear"></div>
-    </div>
+    <table class="layout-table" role="presentation">
+        <tr>
+            <td class="left-align-cell">
+                <p class="header-context">Details</p>
+                <h1>Your current assets and liabilities</h1>
+            </td>
+            <td class="right-align-cell">
+                <p class="meta-text">M. and J. Vollenweider</p>
+                <p class="meta-date">22 May 2026</p>
+            </td>
+        </tr>
+    </table>
 
     <table class="financial-table">
         <thead>
@@ -92,38 +114,16 @@
                 <th scope="col" class="metric-column">Year</th>
                 <th scope="col">2026</th>
                 <th scope="col">2027</th>
-                <th scope="col">2028</th>
-                <th scope="col">2029</th>
-                <th scope="col">2030</th>
-                <th scope="col">2031</th>
-                <th scope="col">2032</th>
-                <th scope="col">2033</th>
-                <th scope="col">2034</th>
-                <th scope="col">2035</th>
-                <th scope="col">2036</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td class="metric-column">
-                    <span class="icon-fallback" aria-hidden="true">&#128100;&#128101;</span> 
-                    Age of (Palle New-Ret_TEST-DATA)
-                </td>
-                <td>36</td><td>37</td><td>38</td><td>39</td><td>40</td><td>41</td><td>42</td><td>43</td><td>44</td><td>45</td><td>46</td>
-            </tr>
-            <tr>
-                <td class="metric-column">
-                    <span class="icon-fallback" aria-hidden="true">&#128101;&#128100;</span> 
-                    Age of (POTTY-TEST-DATA POTTY-TEST-DATA)
-                </td>
-                <td>35</td><td>36</td><td>37</td><td>38</td><td>39</td><td>40</td><td>41</td><td>42</td><td>43</td><td>44</td><td>45</td>
+                <td class="metric-column">Age of (Palle New-Ret_TEST-DATA)</td>
+                <td>36</td>
+                <td>37</td>
             </tr>
         </tbody>
     </table>
 
 </body>
 </html>
-
-
-
-      
