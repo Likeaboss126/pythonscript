@@ -134,7 +134,6 @@
 
 
 import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -155,37 +154,36 @@ public class PdfBoxArtifactFixer {
 
     public static byte[] fixSinglePage(byte[] rawPdf) throws IOException {
         try (PDDocument document = PDDocument.load(rawPdf)) {
-            // 1. Grab page zero immediately since it's a single-page POC
             PDPage page = document.getPage(0);
             PDFStreamParser parser = new PDFStreamParser(page);
             
             List<Object> newTokens = new ArrayList<>();
-            boolean inArtifact = false;
+            boolean inCompatibilityBlock = false;
             Object token;
 
-            // 2. Linear token dump step
             while ((token = parser.parseNextToken()) != null) {
                 if (token instanceof Operator op) {
                     String name = op.getName();
 
-                    if (!inArtifact && PEN_START.contains(name)) {
-                        newTokens.add(COSName.ARTIFACT);
-                        newTokens.add(Operator.getOperator("BMC"));
-                        inArtifact = true;
+                    // 1. When a pen line starts, open a Compatibility Section
+                    if (!inCompatibilityBlock && PEN_START.contains(name)) {
+                        newTokens.add(Operator.getOperator("BX")); 
+                        inCompatibilityBlock = true;
                     }
 
                     newTokens.add(token);
 
-                    if (inArtifact && PEN_END.contains(name)) {
-                        newTokens.add(Operator.getOperator("EMC"));
-                        inArtifact = false;
+                    // 2. When the pen finishes painting, close the Compatibility Section
+                    if (inCompatibilityBlock && PEN_END.contains(name)) {
+                        newTokens.add(Operator.getOperator("EX")); 
+                        inCompatibilityBlock = false;
                     }
                 } else {
                     newTokens.add(token);
                 }
             }
 
-            // 3. Commit straight back to the single canvas source
+            // Write the clean, uncorrupted tokens back
             PDStream updatedStream = new PDStream(document);
             try (OutputStream os = updatedStream.createOutputStream()) {
                 new ContentStreamWriter(os).writeTokens(newTokens);
