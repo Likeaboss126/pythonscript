@@ -147,6 +147,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.pdfbox.contentstream.operator.Operator;
+import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdfparser.PDFStreamParser;
+import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.PDStream;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 public class PdfBoxArtifactFixer {
 
     private static final List<String> PEN_START = Arrays.asList("m", "re");
@@ -157,33 +173,62 @@ public class PdfBoxArtifactFixer {
             PDPage page = document.getPage(0);
             PDFStreamParser parser = new PDFStreamParser(page);
             
-            List<Object> newTokens = new ArrayList<>();
-            boolean inCompatibilityBlock = false;
+            List<Object> tokens = new ArrayList<>();
             Object token;
-
+            
+            // 1. Read all tokens safely into an initial list first
             while ((token = parser.parseNextToken()) != null) {
-                if (token instanceof Operator op) {
-                    String name = op.getName();
+                tokens.add(token);
+            }
 
-                    // 1. When a pen line starts, open a Compatibility Section
-                    if (!inCompatibilityBlock && PEN_START.contains(name)) {
-                        newTokens.add(Operator.getOperator("BX")); 
-                        inCompatibilityBlock = true;
+            List<Object> newTokens = new ArrayList<>();
+            int i = 0;
+            int totalTokens = tokens.size();
+
+            // 2. Process tokens sequentially
+            while (i < totalTokens) {
+                Object current = tokens.get(i);
+
+                if (current instanceof Operator op && PEN_START.contains(op.getName())) {
+                    // Look backward to find where the numbers/coordinates for this pen path started
+                    int coordStartIndex = i;
+                    while (coordStartIndex > 0 && !(tokens.get(coordStartIndex - 1) instanceof Operator)) {
+                        coordStartIndex--;
                     }
 
-                    newTokens.add(token);
+                    // Pull those coordinates out of the standard processing stream
+                    List<Object> coordinates = new ArrayList<>(newTokens.subList(coordStartIndex, newTokens.size()));
+                    newTokens.subList(coordStartIndex, newTokens.size()).clear();
 
-                    // 2. When the pen finishes painting, close the Compatibility Section
-                    if (inCompatibilityBlock && PEN_END.contains(name)) {
-                        newTokens.add(Operator.getOperator("EX")); 
-                        inCompatibilityBlock = false;
+                    // Inject the clean BDC artifact wrapper wrapper *before* the numbers
+                    newTokens.add(COSName.ARTIFACT);
+                    newTokens.add(new COSDictionary()); // Empty property container
+                    newTokens.add(Operator.getOperator("BDC"));
+
+                    // Put the coordinates and the pen starting token back down
+                    newTokens.addAll(coordinates);
+                    newTokens.add(current);
+                    i++;
+
+                    // Consume all tokens until the matching pen paint command finishes the line
+                    while (i < totalTokens) {
+                        Object innerToken = tokens.get(i);
+                        newTokens.add(innerToken);
+                        i++;
+
+                        if (innerToken instanceof Operator innerOp && PEN_END.contains(innerOp.getName())) {
+                            // Close the artifact envelope right after the line draws
+                            newTokens.add(Operator.getOperator("EMC"));
+                            break;
+                        }
                     }
                 } else {
-                    newTokens.add(token);
+                    newTokens.add(current);
+                    i++;
                 }
             }
 
-            // Write the clean, uncorrupted tokens back
+            // 3. Write back the properly balanced token arrangement
             PDStream updatedStream = new PDStream(document);
             try (OutputStream os = updatedStream.createOutputStream()) {
                 new ContentStreamWriter(os).writeTokens(newTokens);
