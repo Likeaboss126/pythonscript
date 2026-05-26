@@ -134,20 +134,6 @@
 
 
 import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.pdfparser.PDFStreamParser;
-import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.common.PDStream;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import org.apache.pdfbox.contentstream.operator.Operator;
 import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
@@ -176,7 +162,6 @@ public class PdfBoxArtifactFixer {
             List<Object> tokens = new ArrayList<>();
             Object token;
             
-            // 1. Read all tokens safely into an initial list first
             while ((token = parser.parseNextToken()) != null) {
                 tokens.add(token);
             }
@@ -185,39 +170,37 @@ public class PdfBoxArtifactFixer {
             int i = 0;
             int totalTokens = tokens.size();
 
-            // 2. Process tokens sequentially
             while (i < totalTokens) {
                 Object current = tokens.get(i);
 
                 if (current instanceof Operator op && PEN_START.contains(op.getName())) {
-                    // Look backward to find where the numbers/coordinates for this pen path started
                     int coordStartIndex = i;
                     while (coordStartIndex > 0 && !(tokens.get(coordStartIndex - 1) instanceof Operator)) {
                         coordStartIndex--;
                     }
 
-                    // Pull those coordinates out of the standard processing stream
                     List<Object> coordinates = new ArrayList<>(newTokens.subList(coordStartIndex, newTokens.size()));
                     newTokens.subList(coordStartIndex, newTokens.size()).clear();
 
-                    // Inject the clean BDC artifact wrapper wrapper *before* the numbers
-                    newTokens.add(COSName.ARTIFACT);
-                    newTokens.add(new COSDictionary()); // Empty property container
+                    // 🛠️ FIX: Create an explicit, valid layout properties dictionary
+                    COSDictionary artifactProps = new COSDictionary();
+                    artifactProps.setName(COSName.TYPE, "Artifact");
+
+                    // Inject the two explicit operands followed by BDC
+                    newTokens.add(COSName.ARTIFACT);    // Operand 1: /Artifact
+                    newTokens.add(artifactProps);       // Operand 2: << /Type /Artifact >>
                     newTokens.add(Operator.getOperator("BDC"));
 
-                    // Put the coordinates and the pen starting token back down
                     newTokens.addAll(coordinates);
                     newTokens.add(current);
                     i++;
 
-                    // Consume all tokens until the matching pen paint command finishes the line
                     while (i < totalTokens) {
                         Object innerToken = tokens.get(i);
                         newTokens.add(innerToken);
                         i++;
 
                         if (innerToken instanceof Operator innerOp && PEN_END.contains(innerOp.getName())) {
-                            // Close the artifact envelope right after the line draws
                             newTokens.add(Operator.getOperator("EMC"));
                             break;
                         }
@@ -228,7 +211,6 @@ public class PdfBoxArtifactFixer {
                 }
             }
 
-            // 3. Write back the properly balanced token arrangement
             PDStream updatedStream = new PDStream(document);
             try (OutputStream os = updatedStream.createOutputStream()) {
                 new ContentStreamWriter(os).writeTokens(newTokens);
