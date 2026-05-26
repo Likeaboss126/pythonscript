@@ -134,7 +134,6 @@
 
 
 import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
 import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
@@ -142,67 +141,57 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDStream;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class PdfBoxArtifactFixer {
 
-    // PDF Vector Path Operators used by Jasper to draw table grid lines
-    private static final List<String> PATH_CONSTRUCTION = Arrays.asList("m", "l", "c", "v", "y", "h", "re");
-    private static final List<String> PATH_PAINTING = Arrays.asList("s", "S", "f", "F", "f*", "b", "B", "b*", "B*");
+    private static final List<String> PEN_START = Arrays.asList("m", "re");
+    private static final List<String> PEN_END = Arrays.asList("s", "S", "f", "F", "b", "B");
 
-    public static byte[] fixUntaggedBorders(byte[] jasperPdfBytes) throws IOException {
-        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(jasperPdfBytes))) {
+    public static byte[] fixSinglePage(byte[] rawPdf) throws IOException {
+        try (PDDocument document = PDDocument.load(rawPdf)) {
+            // 1. Grab page zero immediately since it's a single-page POC
+            PDPage page = document.getPage(0);
+            PDFStreamParser parser = new PDFStreamParser(page);
             
-            // Loop through every single page in the compiled Jasper PDF
-            for (PDPage page : document.getPages()) {
-                PDFStreamParser parser = new PDFStreamParser(page);
-                parser.parse();
-                
-                List<Object> tokens = parser.getTokens();
-                List<Object> newTokens = new ArrayList<>();
-                boolean inArtifact = false;
+            List<Object> newTokens = new ArrayList<>();
+            boolean inArtifact = false;
+            Object token;
 
-                for (Object token : tokens) {
-                    if (token instanceof Operator) {
-                        Operator op = (Operator) token;
-                        String opName = op.getName();
+            // 2. Linear token dump step
+            while ((token = parser.parseNextToken()) != null) {
+                if (token instanceof Operator op) {
+                    String name = op.getName();
 
-                        // 1. Detect if a pen path is being initiated outside of a tag sequence
-                        if (!inArtifact && PATH_CONSTRUCTION.contains(opName)) {
-                            // Inject Begin Marked Content (BMC) for Artifact
-                            newTokens.add(COSName.ARTIFACT);
-                            newTokens.add(Operator.getOperator("BMC"));
-                            inArtifact = true;
-                        }
-
-                        newTokens.add(token);
-
-                        // 2. Detect the paint instruction finishing the line/border drawing
-                        if (inArtifact && PATH_PAINTING.contains(opName)) {
-                            // Inject End Marked Content (EMC)
-                            newTokens.add(Operator.getOperator("EMC"));
-                            inArtifact = false;
-                        }
-                    } else {
-                        newTokens.add(token);
+                    if (!inArtifact && PEN_START.contains(name)) {
+                        newTokens.add(COSName.ARTIFACT);
+                        newTokens.add(Operator.getOperator("BMC"));
+                        inArtifact = true;
                     }
-                }
 
-                // Rewrite the page content stream with the newly wrapped tokens
-                PDStream updatedStream = new PDStream(document);
-                try (var os = updatedStream.createOutputStream()) {
-                    ContentStreamWriter tokenWriter = new ContentStreamWriter(os);
-                    tokenWriter.writeTokens(newTokens);
+                    newTokens.add(token);
+
+                    if (inArtifact && PEN_END.contains(name)) {
+                        newTokens.add(Operator.getOperator("EMC"));
+                        inArtifact = false;
+                    }
+                } else {
+                    newTokens.add(token);
                 }
-                page.setContents(updatedStream);
             }
 
-            // Save document back to byte array
+            // 3. Commit straight back to the single canvas source
+            PDStream updatedStream = new PDStream(document);
+            try (OutputStream os = updatedStream.createOutputStream()) {
+                new ContentStreamWriter(os).writeTokens(newTokens);
+            }
+            page.setContents(updatedStream);
+
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             document.save(baos);
             return baos.toByteArray();
