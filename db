@@ -1,3 +1,4 @@
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -6,95 +7,81 @@ import java.util.List;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.contentstream.operator.Operator;
 import org.apache.pdfbox.cos.COSName;
-import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
 import org.apache.pdfbox.pdfparser.PDFStreamParser;
+import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.PDStream;
 
-public class PdfArtifactMarker {
+public class PdfArtifactFixer {
 
-    public static byte[] artifactPaths(byte[] pdfBytes) throws IOException {
+    public static byte[] fixArtifacts(byte[] pdfBytes) throws IOException {
 
         PDDocument document = Loader.loadPDF(pdfBytes);
 
-        for (PDPage page : document.getPages()) {
+        PDPage page = document.getPage(0);
 
-            PDFStreamParser parser = new PDFStreamParser(page);
+        PDFStreamParser parser = new PDFStreamParser(page);
 
-            List<Object> tokens = parser.parseTokens();
+        List<Object> tokens = parser.parseTokens();
 
-            List<Object> newTokens = new ArrayList<>();
+        List<Object> updatedTokens = new ArrayList<>();
 
-            boolean artifactOpened = false;
+        for (Object token : tokens) {
 
-            for (Object token : tokens) {
+            updatedTokens.add(token);
 
-                if (token instanceof Operator) {
+            if (token instanceof Operator) {
 
-                    Operator op = (Operator) token;
+                Operator op = (Operator) token;
 
-                    String name = op.getName();
+                String name = op.getName();
 
-                    // Path painting operators
-                    boolean isPathPaintOperator =
-                            "S".equals(name) ||
-                            "s".equals(name) ||
-                            "f".equals(name) ||
-                            "F".equals(name) ||
-                            "f*".equals(name) ||
-                            "B".equals(name) ||
-                            "B*".equals(name) ||
-                            "b".equals(name) ||
-                            "b*".equals(name);
+                // Border/vector drawing operators
+                if ("S".equals(name)
+                        || "s".equals(name)
+                        || "f".equals(name)
+                        || "B".equals(name)) {
 
-                    if (isPathPaintOperator) {
+                    // Wrap as Artifact
+                    updatedTokens.add(
+                            updatedTokens.size() - 1,
+                            COSName.getPDFName("Artifact")
+                    );
 
-                        // Begin Artifact
-                        if (!artifactOpened) {
+                    updatedTokens.add(
+                            updatedTokens.size() - 1,
+                            Operator.getOperator("BMC")
+                    );
 
-                            newTokens.add(COSName.getPDFName("Artifact"));
-                            newTokens.add(Operator.getOperator("BMC"));
-
-                            artifactOpened = true;
-                        }
-
-                        newTokens.add(token);
-
-                        // End Artifact
-                        newTokens.add(Operator.getOperator("EMC"));
-
-                        artifactOpened = false;
-
-                        continue;
-                    }
+                    updatedTokens.add(
+                            Operator.getOperator("EMC")
+                    );
                 }
-
-                newTokens.add(token);
             }
-
-            ByteArrayOutputStream updatedStream = new ByteArrayOutputStream();
-
-            ContentStreamWriter writer =
-                    new ContentStreamWriter(updatedStream);
-
-            writer.writeTokens(newTokens);
-
-            page.setContents(
-                    new org.apache.pdfbox.pdmodel.common.PDStream(
-                            document,
-                            new java.io.ByteArrayInputStream(
-                                    updatedStream.toByteArray()
-                            )
-                    )
-            );
         }
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
 
-        document.save(baos);
+        ContentStreamWriter writer =
+                new ContentStreamWriter(output);
+
+        writer.writeTokens(updatedTokens);
+
+        PDStream newStream =
+                new PDStream(document,
+                        new ByteArrayInputStream(
+                                output.toByteArray()));
+
+        page.setContents(newStream);
+
+        ByteArrayOutputStream finalPdf =
+                new ByteArrayOutputStream();
+
+        document.save(finalPdf);
 
         document.close();
 
-        return baos.toByteArray();
+        return finalPdf.toByteArray();
     }
 }
