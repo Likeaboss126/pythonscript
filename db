@@ -13,9 +13,10 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDStream;
 
-public class PdfArtifactFixer {
+public class ArtifactFixer {
 
-    public static byte[] fixArtifacts(byte[] pdfBytes) throws IOException {
+    public static byte[] fixPathArtifacts(byte[] pdfBytes)
+            throws IOException {
 
         PDDocument document = Loader.loadPDF(pdfBytes);
 
@@ -25,64 +26,96 @@ public class PdfArtifactFixer {
 
         List<Object> tokens = new ArrayList<>();
 
-Object token;
+        Object token;
 
-while ((token = parser.parseNextToken()) != null) {
-    tokens.add(token);
-}
+        while ((token = parser.parseNextToken()) != null) {
+            tokens.add(token);
+        }
 
-        List<Object> updatedTokens = new ArrayList<>();
+        List<Object> updated = new ArrayList<>();
 
-        for (Object token : tokens) {
+        boolean insidePath = false;
 
-            updatedTokens.add(token);
+        for (Object obj : tokens) {
 
-            if (token instanceof Operator) {
+            if (obj instanceof Operator) {
 
-                Operator op = (Operator) token;
+                Operator op = (Operator) obj;
 
                 String name = op.getName();
 
-                // Border/vector drawing operators
-                if ("S".equals(name)
-                        || "s".equals(name)
-                        || "f".equals(name)
-                        || "B".equals(name)) {
+                // Path construction operators
+                boolean pathConstruction =
+                        "m".equals(name) ||
+                        "l".equals(name) ||
+                        "c".equals(name) ||
+                        "v".equals(name) ||
+                        "y".equals(name) ||
+                        "h".equals(name) ||
+                        "re".equals(name);
 
-                    updatedTokens.remove(updatedTokens.size() - 1);
+                // Path painting operators
+                boolean pathPainting =
+                        "S".equals(name) ||
+                        "s".equals(name) ||
+                        "f".equals(name) ||
+                        "F".equals(name) ||
+                        "f*".equals(name) ||
+                        "B".equals(name) ||
+                        "B*".equals(name) ||
+                        "b".equals(name) ||
+                        "b*".equals(name);
 
-    updatedTokens.add(COSName.getPDFName("Artifact"));
-    updatedTokens.add(Operator.getOperator("BMC"));
+                // Begin Artifact block
+                if (pathConstruction && !insidePath) {
 
-    updatedTokens.add(op);
+                    updated.add(COSName.getPDFName("Artifact"));
+                    updated.add(Operator.getOperator("BMC"));
 
-    updatedTokens.add(Operator.getOperator("EMC"));
-continue;
+                    insidePath = true;
                 }
+
+                updated.add(obj);
+
+                // End Artifact block
+                if (pathPainting && insidePath) {
+
+                    updated.add(Operator.getOperator("EMC"));
+
+                    insidePath = false;
+                }
+
+            } else {
+
+                updated.add(obj);
             }
         }
 
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream baos =
+                new ByteArrayOutputStream();
 
         ContentStreamWriter writer =
-                new ContentStreamWriter(output);
+                new ContentStreamWriter(baos);
 
-        writer.writeTokens(updatedTokens);
+        writer.writeTokens(updated);
 
         PDStream newStream =
-                new PDStream(document,
+                new PDStream(
+                        document,
                         new ByteArrayInputStream(
-                                output.toByteArray()));
+                                baos.toByteArray()
+                        )
+                );
 
         page.setContents(newStream);
 
-        ByteArrayOutputStream finalPdf =
+        ByteArrayOutputStream output =
                 new ByteArrayOutputStream();
 
-        document.save(finalPdf);
+        document.save(output);
 
         document.close();
 
-        return finalPdf.toByteArray();
+        return output.toByteArray();
     }
 }
