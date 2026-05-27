@@ -1,19 +1,100 @@
-Analyze this codebase and give me a clear breakdown of the tech stack and architecture used.
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-Specifically answer:
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.contentstream.operator.Operator;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
+import org.apache.pdfbox.pdfparser.PDFStreamParser;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 
-1. What frontend framework/library is used (React, Next.js, etc.) and how it is structured (SPA, routing setup)?
-2. Is TypeScript used fully or partially? Where is it used?
-3. How is state management handled (Redux, Context, etc.) and to what extent?
-4. How are API calls made (fetch, axios, custom services)? Where are they located?
-5. What build tool is used (Vite, Webpack, etc.) and how is the project structured around it?
-6. What CSS/styling approach is used (plain CSS, modules, Tailwind, styled-components)?
-7. What are the key folders and their responsibilities (components, services, store, etc.)?
-8. Identify any advanced patterns used (custom hooks, HOCs, middleware, etc.)
-9. How scalable or production-ready is this architecture?
+public class PdfArtifactMarker {
 
-Explain in simple terms as if I am transitioning from QA to development.
+    public static byte[] artifactPaths(byte[] pdfBytes) throws IOException {
 
+        PDDocument document = Loader.loadPDF(pdfBytes);
 
+        for (PDPage page : document.getPages()) {
 
-Based on this project, what are the most important concepts I should learn to work effectively on this codebase? Prioritize them in order and explain why.
+            PDFStreamParser parser = new PDFStreamParser(page);
+
+            List<Object> tokens = parser.parseTokens();
+
+            List<Object> newTokens = new ArrayList<>();
+
+            boolean artifactOpened = false;
+
+            for (Object token : tokens) {
+
+                if (token instanceof Operator) {
+
+                    Operator op = (Operator) token;
+
+                    String name = op.getName();
+
+                    // Path painting operators
+                    boolean isPathPaintOperator =
+                            "S".equals(name) ||
+                            "s".equals(name) ||
+                            "f".equals(name) ||
+                            "F".equals(name) ||
+                            "f*".equals(name) ||
+                            "B".equals(name) ||
+                            "B*".equals(name) ||
+                            "b".equals(name) ||
+                            "b*".equals(name);
+
+                    if (isPathPaintOperator) {
+
+                        // Begin Artifact
+                        if (!artifactOpened) {
+
+                            newTokens.add(COSName.getPDFName("Artifact"));
+                            newTokens.add(Operator.getOperator("BMC"));
+
+                            artifactOpened = true;
+                        }
+
+                        newTokens.add(token);
+
+                        // End Artifact
+                        newTokens.add(Operator.getOperator("EMC"));
+
+                        artifactOpened = false;
+
+                        continue;
+                    }
+                }
+
+                newTokens.add(token);
+            }
+
+            ByteArrayOutputStream updatedStream = new ByteArrayOutputStream();
+
+            ContentStreamWriter writer =
+                    new ContentStreamWriter(updatedStream);
+
+            writer.writeTokens(newTokens);
+
+            page.setContents(
+                    new org.apache.pdfbox.pdmodel.common.PDStream(
+                            document,
+                            new java.io.ByteArrayInputStream(
+                                    updatedStream.toByteArray()
+                            )
+                    )
+            );
+        }
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        document.save(baos);
+
+        document.close();
+
+        return baos.toByteArray();
+    }
+}
