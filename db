@@ -49,20 +49,15 @@ while ((token = parser.parseNextToken()) != null) {
                         || "f".equals(name)
                         || "B".equals(name)) {
 
-                    // Wrap as Artifact
-                    updatedTokens.add(
-                            updatedTokens.size() - 1,
-                            COSName.getPDFName("Artifact")
-                    );
+                    updatedTokens.remove(updatedTokens.size() - 1);
 
-                    updatedTokens.add(
-                            updatedTokens.size() - 1,
-                            Operator.getOperator("BMC")
-                    );
+    updatedTokens.add(COSName.getPDFName("Artifact"));
+    updatedTokens.add(Operator.getOperator("BMC"));
 
-                    updatedTokens.add(
-                            Operator.getOperator("EMC")
-                    );
+    updatedTokens.add(op);
+
+    updatedTokens.add(Operator.getOperator("EMC"));
+continue;
                 }
             }
         }
