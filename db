@@ -23,7 +23,13 @@ public class PdfArtifactFixer {
 
         PDFStreamParser parser = new PDFStreamParser(page);
 
-        List<Object> tokens = parser.parseTokens();
+        List<Object> tokens = new ArrayList<>();
+
+Object token;
+
+while ((token = parser.parseNextToken()) != null) {
+    tokens.add(token);
+}
 
         List<Object> updatedTokens = new ArrayList<>();
 
