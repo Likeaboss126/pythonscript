@@ -1,121 +1,23 @@
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+Objective:
 
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.contentstream.operator.Operator;
-import org.apache.pdfbox.cos.COSName;
-import org.apache.pdfbox.pdfparser.PDFStreamParser;
-import org.apache.pdfbox.pdfwriter.ContentStreamWriter;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.common.PDStream;
+Validate semantic heading generation
 
-public class ArtifactFixer {
+Experiments:
 
-    public static byte[] fixPathArtifacts(byte[] pdfBytes)
-            throws IOException {
+Added H1/H2 tagging properties in JRXML
+Used Jasper PDF export tag properties
 
-        PDDocument document = Loader.loadPDF(pdfBytes);
+Properties used:
 
-        PDPage page = document.getPage(0);
+net.sf.jasperreports.export.pdf.tag.h1
+net.sf.jasperreports.export.pdf.tag.h2
 
-        PDFStreamParser parser = new PDFStreamParser(page);
+Outcome:
 
-        List<Object> tokens = new ArrayList<>();
+Headings correctly recognized in PAC
+Heading hierarchy validated
+Reading order aligned correctly
 
-        Object token;
 
-        while ((token = parser.parseNextToken()) != null) {
-            tokens.add(token);
-        }
 
-        List<Object> updated = new ArrayList<>();
-
-        boolean insidePath = false;
-
-        for (Object obj : tokens) {
-
-            if (obj instanceof Operator) {
-
-                Operator op = (Operator) obj;
-
-                String name = op.getName();
-
-                // Path construction operators
-                boolean pathConstruction =
-                        "m".equals(name) ||
-                        "l".equals(name) ||
-                        "c".equals(name) ||
-                        "v".equals(name) ||
-                        "y".equals(name) ||
-                        "h".equals(name) ||
-                        "re".equals(name);
-
-                // Path painting operators
-                boolean pathPainting =
-                        "S".equals(name) ||
-                        "s".equals(name) ||
-                        "f".equals(name) ||
-                        "F".equals(name) ||
-                        "f*".equals(name) ||
-                        "B".equals(name) ||
-                        "B*".equals(name) ||
-                        "b".equals(name) ||
-                        "b*".equals(name);
-
-                // Begin Artifact block
-                if (pathConstruction && !insidePath) {
-
-                    updated.add(COSName.getPDFName("Artifact"));
-                    updated.add(Operator.getOperator("BMC"));
-
-                    insidePath = true;
-                }
-
-                updated.add(obj);
-
-                // End Artifact block
-                if (pathPainting && insidePath) {
-
-                    updated.add(Operator.getOperator("EMC"));
-
-                    insidePath = false;
-                }
-
-            } else {
-
-                updated.add(obj);
-            }
-        }
-
-        ByteArrayOutputStream baos =
-                new ByteArrayOutputStream();
-
-        ContentStreamWriter writer =
-                new ContentStreamWriter(baos);
-
-        writer.writeTokens(updated);
-
-        PDStream newStream =
-                new PDStream(
-                        document,
-                        new ByteArrayInputStream(
-                                baos.toByteArray()
-                        )
-                );
-
-        page.setContents(newStream);
-
-        ByteArrayOutputStream output =
-                new ByteArrayOutputStream();
-
-        document.save(output);
-
-        document.close();
-
-        return output.toByteArray();
-    }
-}
+4.4 Initial Table Accessibility Attempt
