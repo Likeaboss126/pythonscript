@@ -414,3 +414,103 @@
 
     </band>
 </summary>
+
+
+
+
+
+<detail>
+    <band height="95">
+        
+        <frame>
+            <reportElement x="0" y="0" width="555" height="30" uuid="1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d">
+                <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
+            </reportElement>
+            
+            <staticText>
+                <reportElement x="0" y="0" width="185" height="30" uuid="a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d">
+                    <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"><font isBold="true"/></textElement>
+                <text><![CDATA[Header 1]]></text>
+            </staticText>
+            
+            <staticText>
+                <reportElement x="185" y="0" width="185" height="30" uuid="b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e">
+                    <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"><font isBold="true"/></textElement>
+                <text><![CDATA[Header 2]]></text>
+            </staticText>
+            
+            <staticText>
+                <reportElement x="370" y="0" width="185" height="30" uuid="c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f">
+                    <property name="net.sf.jasperreports.export.pdf.tag.th" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"><font isBold="true"/></textElement>
+                <text><![CDATA[Header 3]]></text>
+            </staticText>
+        </frame>
+
+        <frame>
+            <reportElement x="0" y="30" width="555" height="30" uuid="2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e">
+                <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
+            </reportElement>
+            
+            <textField>
+                <reportElement x="0" y="0" width="185" height="30" uuid="d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a">
+                    <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA["Row 1 - Col 1"]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <reportElement x="185" y="0" width="185" height="30" uuid="e5f6a7b8-c9d0-1e2f-3a4b-5c6d7e8f9a0b">
+                    <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA["Row 1 - Col 2"]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <reportElement x="370" y="0" width="185" height="30" uuid="f6a7b8c9-d0e1-2f3a-4b5c-6d7e8f9a0b1c">
+                    <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA["Row 1 - Col 3"]]></textFieldExpression>
+            </textField>
+        </frame>
+
+        <frame>
+            <reportElement x="0" y="60" width="555" height="30" uuid="3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f">
+                <property name="net.sf.jasperreports.export.pdf.tag.tr" value="full"/>
+            </reportElement>
+            
+            <textField>
+                <reportElement x="0" y="0" width="185" height="30" uuid="a7b8c9d0-e1f2-3a4b-5c6d-7e8f9a0b1c2d">
+                    <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA["Row 2 - Col 1"]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <reportElement x="185" y="0" width="185" height="30" uuid="b8c9d0e1-f2a3-4b5c-6d7e-8f9a0b1c2d3e">
+                    <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA["Row 2 - Col 2"]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <reportElement x="370" y="0" width="185" height="30" uuid="c9d0e1f2-a3b4-5c6d-7e8f-9a0b1c2d3e4f">
+                    <property name="net.sf.jasperreports.export.pdf.tag.td" value="full"/>
+                </reportElement>
+                <textElement verticalAlignment="Middle"/>
+                <textFieldExpression><![CDATA["Row 2 - Col 3"]]></textFieldExpression>
+            </textField>
+        </frame>
+        
+    </band>
+</detail>
