@@ -21,3 +21,70 @@ Reading order aligned correctly
 
 
 4.4 Initial Table Accessibility Attempt
+
+
+import net.sf.jasperreports.engine.DefaultJasperReportsContext;
+import net.sf.jasperreports.engine.JREmptyDataSource;
+import net.sf.jasperreports.engine.JasperCompiledReport;
+import net.sf.jasperreports.engine.JasperPrint;
+import net.sf.jasperreports.engine.JasperReport;
+import net.sf.jasperreports.engine.compiler.JRAbstractCompiler;
+import net.sf.jasperreports.engine.compiler.JasperCompileManager;
+import net.sf.jasperreports.engine.fill.JasperFiller;
+import net.sf.jasperreports.export.SimpleExporterInput;
+import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
+import net.sf.jasperreports.pdf.JRPdfExporter;
+import net.sf.jasperreports.pdf.SimplePdfExporterConfiguration;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+
+public class Jasper7PdfGenerator {
+
+    public static void main(String[] args) {
+        // Define paths for your POC layout files
+        String sourceJrxml = "src/main/resources/accessible_table.jrxml";
+        String targetPdf = "output/accessible_report.pdf";
+
+        try {
+            System.out.println("Step 1: Compiling JRXML using JDT Compiler pipeline...");
+            JasperReport jasperReport = JasperCompileManager.getInstance(DefaultJasperReportsContext.getInstance())
+                    .compile(sourceJrxml);
+
+            System.out.println("Step 2: Filling report parameters and empty data stream...");
+            Map<String, Object> parameters = new HashMap<>();
+            
+            // Since our POC template has no database active, use JREmptyDataSource
+            JasperPrint jasperPrint = JasperFiller.getInstance(DefaultJasperReportsContext.getInstance())
+                    .fill(jasperReport, parameters, new JREmptyDataSource(1));
+
+            System.out.println("Step 3: Initializing v7 Modular PDF Exporter Engine...");
+            JRPdfExporter exporter = new JRPdfExporter(DefaultJasperReportsContext.getInstance());
+            
+            // Link the compilation print to the exporter pipeline
+            exporter.setInbound(new SimpleExporterInput(jasperPrint));
+            exporter.setOutbound(new SimpleOutputStreamExporterOutput(new File(targetPdf)));
+
+            System.out.println("Step 4: Hardcoding Tagged PDF Accessibility Metadata Constraints...");
+            SimplePdfExporterConfiguration configuration = new SimplePdfExporterConfiguration();
+            
+            // 🔑 CRITICAL FOR PAC: This forces the v7 engine to map the logical structure tree
+            configuration.setTagged(true);
+            configuration.setMetadataAuthor("Automation Engine");
+            configuration.setMetadataTitle("Accessible Compliance Table POC");
+            configuration.setDisplayMetadataTitle(true);
+            
+            exporter.setConfiguration(configuration);
+
+            System.out.println("Step 5: Writing binary content to disk...");
+            exporter.export();
+
+            System.out.println("🎉 Done! Document generated successfully at: " + new File(targetPdf).getAbsolutePath());
+
+        } catch (Exception e) {
+            System.err.println("❌ Critical Engine Failure encountered during PDF output generation:");
+            e.printStackTrace();
+        }
+    }
+}
