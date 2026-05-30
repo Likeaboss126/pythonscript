@@ -15,3 +15,6 @@ min-width: [Insert width from JRXML]px;
 white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
+
+
+*"Convert the selected JRXML snippet into a clean Thymeleaf template and embedded CSS block using our project instructions."*
