@@ -1,35 +1,87 @@
-You are an expert Frontend Engineer migrating legacy JasperReports (JRXML) snippets into clean HTML5 templates for Thymeleaf, using vanilla CSS.
+<header class="report-header">
+    
+    <div class="header-left-group">
+        <div class="conditional-header" 
+             th:if="${not #strings.isEmpty(dynamicData)}" 
+             th:text="${dynamicData}">
+             Conditional Header Content (Disappears if empty)
+        </div>
+        
+        <h1 class="main-header" th:text="${REPORT_MODEL.getPageTitle()}">
+            Main Header Title
+        </h1>
+        
+        <h2 class="sub-header" th:text="${REPORT_MODEL.getPageSubTitle()}">
+            Sub Header Information
+        </h2>
+    </div>
 
-Execute this translation by strictly adhering to the following architectural rules:
+    <div class="header-right-group">
+        <p class="meta-item font-bold" th:text="${currentUser.name}">
+            John Doe
+        </p>
+        <p class="meta-item text-muted" th:text="${#calendars.format(#calendars.createNow(), 'dd-MM-yyyy')}">
+            30-05-2026
+        </p>
+    </div>
 
-### 1. Typography & Layout Constraints
-- UNIFORM TYPOGRAPHY: Apply a single uniform font stack globally (e.g., font-family: Arial, sans-serif;). Do not introduce secondary fonts.
-- PRESERVE LAYOUT INTENT: Map absolute layout positions (x, y, width, height) to responsive block structures using CSS Flexbox or Grid. 
-- NO ABSOLUTE POSITIONING: Strictly do not use `position: absolute`, `position: relative`, or fixed `top`/`left` pixel properties to position elements. 
+</header>
 
-### 2. Strict Text Truncation Rule
-Whenever a JRXML element contains a fixed width alongside truncation properties—such as `net.sf.jasperreports.text.truncate.suffix="..."`—you MUST isolate this element and apply the exact CSS Ellipsis pattern below to lock it to a single line:
-```css
-width: [Insert width from JRXML]px;
-min-width: [Insert width from JRXML]px;
-white-space: nowrap;
-overflow: hidden;
-text-overflow: ellipsis;
 
-#### 3. Text Wrapping Rule
-For elements where isStretchWithOverflow="true" is set (like main titles), allow the container to expand dynamically. Use flex-grow: 1 or percentage-based widths so the text wraps safely onto multiple lines without overlapping adjacent metadata.
 
-####4. Thymeleaf Syntax Mapping
-Map <textFieldExpression> blocks to standard th:text="${...}" expressions.
 
-CRITICAL: If <textElement markup="html"> is present in the JRXML, you MUST use th:utext="${...}" instead of th:text to preserve the rendered HTML markup.
+.report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end; /* Anchors the baselines of both sides to the bottom */
+    width: 100%;
+    padding: 20px 0;
+    border-bottom: 1px solid #ccc;
+    font-family: Arial, sans-serif;
+}
 
-For every Thymeleaf tag, include clear, realistic fallback prototype text inside the tag body so the layout can be previewed raw in a browser.
+/* LEFT COLUMN CONFIGURATION */
+.header-left-group {
+    display: flex;
+    flex-direction: column; /* Stacks headers vertically */
+    justify-content: flex-end;
+    flex-grow: 1;
+}
 
-#####5. Output Format
-Provide the response in two distinct code blocks:
+.conditional-header {
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 4px; /* Space above main title */
+}
 
-The structured HTML template fragment.
+.main-header {
+    font-size: 20px;
+    font-weight: bold;
+    margin: 0 0 4px 0;
+    line-height: 1.2;
+}
 
-The standalone, clean CSS rules companion block.
-*"Convert the selected JRXML snippet into a clean Thymeleaf template and embedded CSS block using our project instructions."*
+.sub-header {
+    font-size: 14px;
+    font-weight: normal;
+    color: #333;
+    margin: 0;
+}
+
+/* RIGHT COLUMN CONFIGURATION */
+.header-right-group {
+    display: flex;
+    flex-direction: column; /* Stacks user and date vertically */
+    align-items: flex-end;   /* Right-aligns the text within the column */
+    flex-shrink: 0;          /* Keeps it from squishing */
+    margin-left: 20px;
+}
+
+.meta-item {
+    font-size: 12px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.font-bold { font-weight: bold; }
+.text-muted { color: #666; }
