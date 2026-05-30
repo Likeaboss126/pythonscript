@@ -16,5 +16,20 @@ white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
 
+#### 3. Text Wrapping Rule
+For elements where isStretchWithOverflow="true" is set (like main titles), allow the container to expand dynamically. Use flex-grow: 1 or percentage-based widths so the text wraps safely onto multiple lines without overlapping adjacent metadata.
 
+####4. Thymeleaf Syntax Mapping
+Map <textFieldExpression> blocks to standard th:text="${...}" expressions.
+
+CRITICAL: If <textElement markup="html"> is present in the JRXML, you MUST use th:utext="${...}" instead of th:text to preserve the rendered HTML markup.
+
+For every Thymeleaf tag, include clear, realistic fallback prototype text inside the tag body so the layout can be previewed raw in a browser.
+
+#####5. Output Format
+Provide the response in two distinct code blocks:
+
+The structured HTML template fragment.
+
+The standalone, clean CSS rules companion block.
 *"Convert the selected JRXML snippet into a clean Thymeleaf template and embedded CSS block using our project instructions."*
