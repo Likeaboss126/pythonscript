@@ -10,25 +10,22 @@ import java.awt.geom.Rectangle2D;
 public class VectorChartExporter {
 
     public static String convertDrawableToRawSvg(Drawable drawable, int targetWidth, int targetHeight) {
-        try {
-            // 1. Create the clean JFreeSVG canvas
+      try {
             SVGGraphics2D svg2d = new SVGGraphics2D(targetWidth, targetHeight);
-            
-            // 2. THE SECRET SAUCE FOR SVG TEXT ALIGNMENT: 
-            // This forces the text layout engine to calculate exact sub-pixel positioning,
-            // preventing labels from overlapping or clipping when converted to PDF paths.
             svg2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
             svg2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-            // 3. Draw the chart shapes into the vector context
             Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
             drawable.draw(svg2d, area);
 
-            // 4. Return the pure, pristine XML string
-            return svg2d.getSVGElement(); 
+            // 1. Get the raw XML string
+            String svgElement = svg2d.getSVGElement(); 
+
+            // 2. Encode it into a Base64 string to completely hide the raw XML text from the PDF parser
+            return Base64.getEncoder().encodeToString(svgElement.getBytes("UTF-8"));
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed compiling raw SVG string seamlessly", e);
+            throw new RuntimeException("Failed compiling vector SVG string", e);
         }
     }
 }
