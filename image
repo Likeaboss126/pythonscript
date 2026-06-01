@@ -1,6 +1,5 @@
-import org.jfree.chart.JFreeChart;
-import org.jfree.chart.plot.CategoryPlot;
-import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.ChartTheme;
+import org.jfree.chart.StandardChartTheme;
 import org.jfree.chart.ui.Drawable;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -8,7 +7,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Method;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,63 +21,32 @@ public class HighDpiChartExporter {
         int renderWidth = widthPt * scale;
         int renderHeight = heightPt * scale;
 
+        // 1. CREATE A FORCEFUL HIGH-CONTRAST GLOBAL THEME
+        StandardChartTheme darkLinesTheme = (StandardChartTheme) StandardChartTheme.createLegacyTheme();
+        
+        // Force gridlines to render dark and visible
+        darkLinesTheme.setRangeGridlinePaint(Color.GRAY);        // Solid slate gray instead of silver
+        darkLinesTheme.setDomainGridlinePaint(Color.GRAY);
+        
+        // Force structural axis lines to render clean and distinct
+        darkLinesTheme.setAxisLinePaint(Color.DARK_GRAY);
+        darkLinesTheme.setBaselinePaint(Color.DARK_GRAY);
+        
+        // Apply the settings across the global JFree runtime engine context
+        org.jfree.chart.ChartFactory.setChartTheme(darkLinesTheme);
+
         for (Map.Entry<String, Drawable> entry : chartMap.entrySet()) {
             try {
                 Drawable drawable = entry.getValue();
-                JFreeChart jfreeChart = null;
 
-                // 1. Uncover the JFreeChart instance if it's hidden inside your wrapper
-                if (drawable instanceof JFreeChart) {
-                    jfreeChart = (JFreeChart) drawable;
-                } else {
-                    // Reflection fallback: Try to look for common getter names in your custom class
-                    String[] getterNames = {"getChart", "getJFreeChart", "getPlot"};
-                    for (String name : getterNames) {
-                        try {
-                            Method method = drawable.getClass().getMethod(name);
-                            Object result = method.invoke(drawable);
-                            if (result instanceof JFreeChart) {
-                                jfreeChart = (JFreeChart) result;
-                                break;
-                            }
-                        } catch (Exception ignored) {
-                            // Method doesn't exist on this wrapper, try next one
-                        }
-                    }
-                }
-
-                // 2. Apply targeted theme enhancements to ONLY the gridlines and axes
-                if (jfreeChart != null) {
-                    jfreeChart.setAntiAlias(true);
-                    
-                    if (jfreeChart.getPlot() instanceof CategoryPlot) {
-                        CategoryPlot plot = (CategoryPlot) jfreeChart.getPlot();
-                        
-                        // Force horizontal gridlines to be distinct and sharp
-                        plot.setRangeGridlinesVisible(true);
-                        plot.setRangeGridlinePaint(Color.GRAY); // Solid grey line instead of light silver
-                        plot.setRangeGridlineStroke(new BasicStroke(1.5f)); // Stronger definition
-                        
-                        // Make the bottom baseline axis solid and visible
-                        plot.setOutlinePaint(Color.DARK_GRAY);
-                        plot.setOutlineStroke(new BasicStroke(1.5f));
-                        
-                    } else if (jfreeChart.getPlot() instanceof XYPlot) {
-                        XYPlot plot = (XYPlot) jfreeChart.getPlot();
-                        plot.setRangeGridlinesVisible(true);
-                        plot.setRangeGridlinePaint(Color.GRAY);
-                        plot.setRangeGridlineStroke(new BasicStroke(1.5f));
-                        plot.setOutlinePaint(Color.DARK_GRAY);
-                    }
-                }
-
-                // 3. Render clean High-Res PNG Context (Completely throw away the HighContrastProxy class)
+                // 2. Standard High-Res Image Pipeline setup
                 BufferedImage image = new BufferedImage(renderWidth, renderHeight, BufferedImage.TYPE_INT_RGB);
                 Graphics2D g2d = image.createGraphics();
 
                 g2d.setColor(Color.WHITE);
                 g2d.fillRect(0, 0, renderWidth, renderHeight);
 
+                // Apply rendering quality configurations
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
                 g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
@@ -87,19 +54,19 @@ public class HighDpiChartExporter {
 
                 g2d.scale(scale, scale);
 
-                // Draw the chart layout natively
+                // Draw the wrapped chart natively 
                 java.awt.geom.Rectangle2D area = new java.awt.geom.Rectangle2D.Double(0, 0, widthPt, heightPt);
                 drawable.draw(g2d, area);
                 g2d.dispose();
 
-                // 4. Output the clean Base64 string
+                // Convert bytes to Base64
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 ImageIO.write(image, "png", baos);
                 String base64String = Base64.getEncoder().encodeToString(baos.toByteArray());
                 
                 base64Map.put(entry.getKey(), base64String);
             } catch (Exception e) {
-                throw new RuntimeException("Error customizing gridlines for chart key: " + entry.getKey(), e);
+                throw new RuntimeException("Failed processing global theme override for key: " + entry.getKey(), e);
             }
         }
         return base64Map;
