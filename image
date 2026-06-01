@@ -2,22 +2,34 @@ String rawSvgString = VectorChartExporter.convertDrawableToRawSvg((Drawable) bas
 model.addAttribute("chartSvg", rawSvgString);
 
 
-public static String convertDrawableToRawSvg(Drawable drawable, int targetWidth, int targetHeight) {
-    try {
-        SVGGraphics2D svg2d = new SVGGraphics2D(targetWidth, targetHeight);
-        
-        // Optional: Ensure point alignment
-        svg2d.setShapeUnits(SVGUnits.PT);
-        svg2d.setTextUnits(SVGUnits.PT);
+import org.jfree.chart.ui.Drawable;
+import org.jfree.graphics2d.svg.SVGGraphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.Rectangle2D;
 
-        Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
-        drawable.draw(svg2d, area);
+public class VectorChartExporter {
 
-        // Just return the raw XML text string straight out!
-        return svg2d.getSVGElement(); 
+    public static String convertDrawableToRawSvg(Drawable drawable, int targetWidth, int targetHeight) {
+        try {
+            // 1. Create the clean JFreeSVG canvas
+            SVGGraphics2D svg2d = new SVGGraphics2D(targetWidth, targetHeight);
+            
+            // 2. THE SECRET SAUCE FOR SVG TEXT ALIGNMENT: 
+            // This forces the text layout engine to calculate exact sub-pixel positioning,
+            // preventing labels from overlapping or clipping when converted to PDF paths.
+            svg2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+            svg2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-    } catch (Exception e) {
-        throw new RuntimeException("Failed compiling raw SVG string", e);
+            // 3. Draw the chart shapes into the vector context
+            Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
+            drawable.draw(svg2d, area);
+
+            // 4. Return the pure, pristine XML string
+            return svg2d.getSVGElement(); 
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed compiling raw SVG string seamlessly", e);
+        }
     }
 }
 
