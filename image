@@ -93,3 +93,98 @@ model.addAttribute("charts", encodedCharts);
     <img th:src="|data:image/png;base64,${charts.pensionGrowth}|" 
          style="width: 727pt !important; height: 330pt !important; display: block; image-rendering: -webkit-optimize-contrast;" />
 </div>
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.CategoryPlot;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.ui.Drawable;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import javax.imageio.ImageIO;
+
+public class HighDpiChartExporter {
+
+    public static Map<String, String> convertChartsToBase64(Map<String, Drawable> chartMap, int widthPt, int heightPt) {
+        Map<String, String> base64Map = new HashMap<>();
+        
+        int scale = 3; 
+        int renderWidth = widthPt * scale;
+        int renderHeight = heightPt * scale;
+
+        for (Map.Entry<String, Drawable> entry : chartMap.entrySet()) {
+            try {
+                Drawable drawable = entry.getValue();
+
+                // FORCE THE CHART STYLES TO BE DARK AND THICK
+                if (drawable instanceof JFreeChart) {
+                    JFreeChart chart = (JFreeChart) drawable;
+                    
+                    // 1. Force crisp text anti-aliasing directly on the JFree engine
+                    chart.setAntiAlias(true);
+                    chart.setTextAntiAlias(RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+
+                    // 2. Intercept the plot layer to change gridline styles
+                    if (chart.getPlot() instanceof CategoryPlot) {
+                        CategoryPlot plot = (CategoryPlot) chart.getPlot();
+                        
+                        // Force horizontal gridlines to be solid black and twice as thick
+                        plot.setRangeGridlinesVisible(true);
+                        plot.setRangeGridlinePaint(Color.DARK_GRAY); // Or Color.BLACK
+                        plot.setRangeGridlineStroke(new BasicStroke(2.0f)); // Double thickness
+                        
+                        // If you want vertical gridlines dark too
+                        plot.setDomainGridlinesVisible(true);
+                        plot.setDomainGridlinePaint(Color.DARK_GRAY);
+                        plot.setDomainGridlineStroke(new BasicStroke(2.0f));
+
+                    } else if (chart.getPlot() instanceof XYPlot) {
+                        XYPlot plot = (XYPlot) chart.getPlot();
+                        
+                        // Fallback handling if your layout uses numerical XY plots instead of categorical bars
+                        plot.setRangeGridlinesVisible(true);
+                        plot.setRangeGridlinePaint(Color.DARK_GRAY);
+                        plot.setRangeGridlineStroke(new BasicStroke(2.0f));
+                        
+                        plot.setDomainGridlinesVisible(true);
+                        plot.setDomainGridlinePaint(Color.DARK_GRAY);
+                        plot.setDomainGridlineStroke(new BasicStroke(2.0f));
+                    }
+                }
+
+                // Standard High-Res Rendering Context Setup
+                BufferedImage image = new BufferedImage(renderWidth, renderHeight, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2d = image.createGraphics();
+
+                g2d.setColor(Color.WHITE);
+                g2d.fillRect(0, 0, renderWidth, renderHeight);
+
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_NORMALIZE);
+
+                g2d.scale(scale, scale);
+
+                // Draw chart on the high-DPI canvas
+                java.awt.geom.Rectangle2D area = new java.awt.geom.Rectangle2D.Double(0, 0, widthPt, heightPt);
+                drawable.draw(g2d, area);
+                g2d.dispose();
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ImageIO.write(image, "png", baos);
+                String base64String = Base64.getEncoder().encodeToString(baos.toByteArray());
+                
+                base64Map.put(entry.getKey(), base64String);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed hardcoding dark strokes on asset key: " + entry.getKey(), e);
+            }
+        }
+        return base64Map;
+    }
+}
