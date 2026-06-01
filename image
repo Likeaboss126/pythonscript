@@ -1,23 +1,70 @@
-public String convertDrawableToBase64(Drawable drawable, int width, int height) {
-        try {
-            // 1. Create an in-memory blank canvas matching your targeted report layout dimensions
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2 = image.createGraphics();
-            
-            // 2. Force the JCommon Drawable component to paint its vector graphics onto our canvas
-            java.awt.geom.Rectangle2D area = new java.awt.geom.Rectangle2D.Double(0, 0, width, height);
-            drawable.draw(g2, area);
-            g2.dispose(); // Free up system graphics resources immediately
+import org.jfree.chart.ui.Drawable;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.util.Base64;
+import javax.imageio.ImageIO;
 
-            // 3. Compress the raw bitmap canvas down into a standard PNG byte stream
+public class PristineChartExporter {
+
+    public static String convertDrawableToBase64(Drawable drawable, int targetWidth, int targetHeight) {
+        try {
+            // 1. Define the scale factor (2x creates sharp pixels without breaking internal text scales)
+            double scale = 2.0;
+            int imageWidth = (int) (targetWidth * scale);
+            int imageHeight = (int) (targetHeight * scale);
+
+            // 2. Instantiate our high-density blank canvas
+            BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2d = image.createGraphics();
+
+            // 3. Inject Vector Smoothing Engines
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+
+            // 4. THE CRITICAL FIX: Scale the coordinate space transformation matrix
+            // This forces fonts and lines to scale proportionally instead of distorting
+            AffineTransform oldTransform = g2d.getTransform();
+            g2d.scale(scale, scale);
+
+            // 5. Tell the BaseProjectChart to draw at its natural, intended blueprint size
+            // It draws inside the target bounds, and our g2d.scale cleanly blow up the vectors
+            Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
+            drawable.draw(g2d, area);
+
+            // Restore the original graphics transform state
+            g2d.setTransform(oldTransform);
+            g2d.dispose();
+
+            // 6. Output to a clean Base64 PNG
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(image, "png", baos);
-            byte[] imageBytes = baos.toByteArray();
-
-            // 4. Encode the raw binary bytes into a clean, text-safe Base64 string
-            return Base64.getEncoder().encodeToString(imageBytes);
+            return Base64.getEncoder().encodeToString(baos.toByteArray());
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to render JCommonDrawable to base64 string", e);
+            throw new RuntimeException("Failed compiling non-distorted chart matrix", e);
         }
     }
+}
+
+
+
+// Pass the target layout size (e.g., 600 by 350 units)
+// The exporter will create a crisp 1200x700 image behind the scenes but scale the components perfectly!
+String cleanChartString = PristineChartExporter.convertDrawableToBase64((Drawable) baseProjectChart, 600, 350);
+
+model.addAttribute("cleanChartImage", cleanChartString);
+
+
+<div class="chart-box" style="width: 100%; text-align: center;">
+    
+    <img th:src="|data:image/png;base64,${cleanChartImage}|" 
+         style="width: 600pt; height: 350pt; display: block; margin: 0 auto;" 
+         alt="Proportional Non-Distorted Chart Layout" />
+         
+</div>
