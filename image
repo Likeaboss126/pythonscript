@@ -58,5 +58,12 @@ public class PristineChartExporter {
 String base64Chart = PristineChartExporter.convertDrawableToBase64((Drawable) baseProjectChart, 1454, 660);
 model.addAttribute("cleanChartImage", base64Chart);
 
-<img th:src="|data:image/png;base64,${cleanChartImage}|" 
-     style="width: 727pt !important; height: 330pt !important; display: block; margin: 0 auto; image-rendering: auto;" />
+<div class="chart-layout-box" style="width: 727pt; height: 330pt; margin: 0 auto; block-size: 330pt; overflow: hidden;">
+
+    <img th:src="|data:image/png;base64,${cleanChartImage}|" 
+         width="727" 
+         height="330"
+         style="width: 100% !important; height: 100% !important; display: block; image-rendering: auto;" 
+         alt="Full Size Crisp Chart Layout" />
+
+</div>
