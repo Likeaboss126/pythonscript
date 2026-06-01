@@ -40,3 +40,22 @@ public class DynamicChartDrawer implements FSObjectDrawer {
         }
     }
 }
+\
+
+PdfRendererBuilder builder = new PdfRendererBuilder();
+
+// Bind your custom chart drawer instance right into the core rendering lifecycle
+builder.useObjectDrawer("application/x-project-chart", new NativeChartDrawer((Drawable) baseProjectChart));
+
+// ... your standard builder configuration properties ...
+builder.withHtmlFile(htmlInputFile);
+builder.toStream(outputPdfStream);
+builder.run(); 
+
+<div class="chart-pdf-wrapper" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
+
+    <object type="application/x-project-chart" 
+            style="width: 727pt; height: 330pt; display: block;">
+    </object>
+
+</div>
