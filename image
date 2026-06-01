@@ -1,55 +1,42 @@
+import io.github.openhtmltopdf.extend.FSObjectDrawer;
+import io.github.openhtmltopdf.extend.OutputDevice;
 import org.w3c.dom.Element;
-import org.xhtmlrenderer.extend.FSObjectDrawer;
-import org.xhtmlrenderer.extend.OutputDevice;
 import org.jfree.chart.ui.Drawable;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.Rectangle2D;
+import java.util.Map;
 
-public class NativeChartDrawer implements FSObjectDrawer {
+public class DynamicChartDrawer implements FSObjectDrawer {
     
-    private final Drawable chartDrawable;
+    private final Map<String, Drawable> chartMap;
 
-    public NativeChartDrawer(Drawable chartDrawable) {
-        this.chartDrawable = chartDrawable;
+    public DynamicChartDrawer(Map<String, Drawable> chartMap) {
+        this.chartMap = chartMap;
     }
 
+    // THE CORRECT METHOD SIGNATURE OVERRIDE
     @Override
-    public void draw(Element e, double x, double y, double width, double height, OutputDevice device) {
-        // 1. Grab the direct, native PDF Vector Graphics context
-        Graphics2D g2d = device.getGraphics();
-
-        // 2. Inject pristine rendering quality configurations
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-        g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-
-        // 3. Force the chart to calculate its vectors directly for the physical PDF dimensions
-        Rectangle2D area = new Rectangle2D.Double(x, y, width, height);
+    public void drawObject(Element e, double x, double y, double width, double height, 
+                           OutputDevice device, io.github.openhtmltopdf.render.RenderingContext context) {
         
-        // This invokes your BaseProjectChart directly onto the PDF page!
-        chartDrawable.draw(g2d, area);
+        // 1. Fetch the identifier attribute from your HTML tag
+        String chartKey = e.getAttribute("data-chart-key");
+        Drawable chartDrawable = chartMap.get(chartKey);
+        
+        if (chartDrawable != null) {
+            // 2. THE CORRECT GRAPHICS GETTER: Get the native Graphics2D pipeline
+            Graphics2D g2d = device.getGraphics2D();
+            
+            // 3. Set crisp rendering setups directly onto the PDF canvas context
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+
+            // 4. Draw the chart using the exact physical coordinates passed by the layout engine
+            Rectangle2D area = new Rectangle2D.Double(x, y, width, height);
+            chartDrawable.draw(g2d, area);
+        }
     }
 }
-
-
-
-PdfRendererBuilder builder = new PdfRendererBuilder();
-
-// Bind your custom chart drawer instance right into the core rendering lifecycle
-builder.useObjectDrawer("application/x-project-chart", new NativeChartDrawer((Drawable) baseProjectChart));
-
-// ... your standard builder configuration properties ...
-builder.withHtmlFile(htmlInputFile);
-builder.toStream(outputPdfStream);
-builder.run();
-
-
-<div class="chart-pdf-wrapper" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
-
-    <object type="application/x-project-chart" 
-            style="width: 727pt; height: 330pt; display: block;">
-    </object>
-
-</div>
