@@ -78,3 +78,18 @@ model.addAttribute("charts", encodedCharts);
     <img th:src="|data:image/png;base64,${charts.pensionGrowth}|" 
          style="width: 727pt !important; height: 330pt !important; display: block; image-rendering: -webkit-optimize-contrast;" />
 </div>
+
+
+
+
+<div class="chart-container" style="width: 727pt; height: 330pt; margin: 0 auto;">
+    <img th:src="|data:image/png;base64,${charts.liquidAssets}|" 
+         style="width: 727pt !important; height: 330pt !important; display: block; image-rendering: -webkit-optimize-contrast;" />
+</div>
+
+<div class="page-break" style="page-break-after: always;"></div>
+
+<div class="chart-container" style="width: 727pt; height: 330pt; margin: 0 auto; margin-top: 40pt;">
+    <img th:src="|data:image/png;base64,${charts.pensionGrowth}|" 
+         style="width: 727pt !important; height: 330pt !important; display: block; image-rendering: -webkit-optimize-contrast;" />
+</div>
