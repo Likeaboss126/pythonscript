@@ -1,74 +1,60 @@
+<dependency>
+    <groupId>io.github.openhtmltopdf</groupId>
+    <artifactId>openhtmltopdf-core</artifactId>
+    <version>1.0.10</version> </dependency>
+
+<dependency>
+    <groupId>io.github.openhtmltopdf</groupId>
+    <artifactId>openhtmltopdf-svg-support</artifactId>
+    <version>1.0.10</version> 
+</dependency>
+
+<dependency>
+    <groupId>org.jfree</groupId>
+    <artifactId>jfreesvg</artifactId>
+    <version>3.4.3</version>
+</dependency>
+
+
+
 import org.jfree.chart.ui.Drawable;
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
+import org.jfree.graphics2d.svg.SVGGraphics2D;
+import org.jfree.graphics2d.svg.SVGUnits;
+import java.awt.geom.Rectangle2D;
 import java.util.Base64;
-import javax.imageio.ImageIO;
 
-public class HighContrastChartExporter {
+public class VectorChartExporter {
 
-    public static String convertDrawableToBase64(Drawable drawable, int targetWidth, int targetHeight) {
+    public static String convertDrawableToSvgBase64(Drawable drawable, int targetWidth, int targetHeight) {
         try {
-            // 1. Maintain your 2x pixel size for sharpness
-            int scaleFactor = 2;
-            int imageWidth = targetWidth * scaleFactor;
-            int imageHeight = targetHeight * scaleFactor;
+            // 1. Create a Scalable Vector Graphics canvas instead of a pixel buffer
+            SVGGraphics2D svg2d = new SVGGraphics2D(targetWidth, targetHeight);
 
-            BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_RGB);
-            Graphics2D g2d = image.createGraphics();
+            // 2. Direct your chart to draw its mathematical shapes onto the vector canvas
+            Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
+            drawable.draw(svg2d, area);
 
-            // 2. Clear background to pure white
-            g2d.setColor(Color.WHITE);
-            g2d.fillRect(0, 0, imageWidth, imageHeight);
+            // 3. Extract the raw SVG XML string text (e.g., <svg><rect.../><text...></svg>)
+            // We use standard PT units to align perfectly with OpenHTMLtoPDF
+            String svgElement = svg2d.getSVGElement(null, true, null, null, SVGUnits.PT);
 
-            // 3. THE TEXT & LINE SHARPNESS FIXES
-            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            
-            // Force the font engine to use crisp sub-pixel text rendering (Removes the fuzzy blur)
-            g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
-            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            
-            // CRITICAL: Force the stroke layout engine to snap to absolute grid points
-            g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_NORMALIZE);
-
-            // 4. THE LINE CONTRAST FIX: Scale up all thin vector lines
-            // This applies a 2x transform to your coordinate system so the internal chart lines 
-            // (like grid lines and age line loops) get drawn with double the pixel thickness.
-            java.awt.geom.AffineTransform oldTransform = g2d.getTransform();
-            g2d.scale(2.0, 2.0);
-
-            // 5. Draw the chart layout at point sizes
-            java.awt.geom.Rectangle2D area = new java.awt.geom.Rectangle2D.Double(0, 0, targetWidth, targetHeight);
-            drawable.draw(g2d, area);
-            
-            g2d.setTransform(oldTransform);
-            g2d.dispose();
-
-            // 6. Output clean Base64 string
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(image, "png", baos);
-            return Base64.getEncoder().encodeToString(baos.toByteArray());
+            // 4. Encode the clean XML text to a Base64 string for safe HTML injection
+            return Base64.getEncoder().encodeToString(svgElement.getBytes("UTF-8"));
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed compiling high-contrast chart lines", e);
+            throw new RuntimeException("Failed compiling high-grade vector SVG chart matrix", e);
         }
     }
-}
+}// Pass your strict target points directly
+String vectorSvgBase64 = VectorChartExporter.convertDrawableToSvgBase64((Drawable) baseProjectChart, 727, 330);
+
+model.addAttribute("vectorChart", vectorSvgBase64);
 
 
+<div class="chart-vector-wrapper" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
 
-// Pass target points directly
-String base64Chart = HighContrastChartExporter.convertDrawableToBase64((Drawable) baseProjectChart, 727, 330);
-model.addAttribute("cleanChartImage", base64Chart);
-
-
-<div class="chart-box" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
-
-    <img th:src="|data:image/png;base64,${cleanChartImage}|" 
-         style="width: 727pt !important; height: 330pt !important; display: block; image-rendering: -webkit-optimize-contrast;" 
-         alt="High Contrast Chart Output" />
+    <img th:src="|data:image/svg+xml;base64,${vectorChart}|" 
+         style="width: 727pt !important; height: 330pt !important; display: block;" 
+         alt="High-Grade Vector Chart Output" />
 
 </div>
