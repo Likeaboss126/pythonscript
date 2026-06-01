@@ -1,60 +1,29 @@
-<dependency>
-    <groupId>io.github.openhtmltopdf</groupId>
-    <artifactId>openhtmltopdf-core</artifactId>
-    <version>1.0.10</version> </dependency>
-
-<dependency>
-    <groupId>io.github.openhtmltopdf</groupId>
-    <artifactId>openhtmltopdf-svg-support</artifactId>
-    <version>1.0.10</version> 
-</dependency>
-
-<dependency>
-    <groupId>org.jfree</groupId>
-    <artifactId>jfreesvg</artifactId>
-    <version>3.4.3</version>
-</dependency>
+String rawSvgString = VectorChartExporter.convertDrawableToRawSvg((Drawable) baseProjectChart, 727, 330);
+model.addAttribute("chartSvg", rawSvgString);
 
 
+public static String convertDrawableToRawSvg(Drawable drawable, int targetWidth, int targetHeight) {
+    try {
+        SVGGraphics2D svg2d = new SVGGraphics2D(targetWidth, targetHeight);
+        
+        // Optional: Ensure point alignment
+        svg2d.setShapeUnits(SVGUnits.PT);
+        svg2d.setTextUnits(SVGUnits.PT);
 
-import org.jfree.chart.ui.Drawable;
-import org.jfree.graphics2d.svg.SVGGraphics2D;
-import org.jfree.graphics2d.svg.SVGUnits;
-import java.awt.geom.Rectangle2D;
-import java.util.Base64;
+        Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
+        drawable.draw(svg2d, area);
 
-public class VectorChartExporter {
+        // Just return the raw XML text string straight out!
+        return svg2d.getSVGElement(); 
 
-    public static String convertDrawableToSvgBase64(Drawable drawable, int targetWidth, int targetHeight) {
-        try {
-            // 1. Create a Scalable Vector Graphics canvas instead of a pixel buffer
-            SVGGraphics2D svg2d = new SVGGraphics2D(targetWidth, targetHeight);
-
-            // 2. Direct your chart to draw its mathematical shapes onto the vector canvas
-            Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
-            drawable.draw(svg2d, area);
-
-            // 3. Extract the raw SVG XML string text (e.g., <svg><rect.../><text...></svg>)
-            // We use standard PT units to align perfectly with OpenHTMLtoPDF
-            String svgElement = svg2d.getSVGElement(null, true, null, null, SVGUnits.PT);
-
-            // 4. Encode the clean XML text to a Base64 string for safe HTML injection
-            return Base64.getEncoder().encodeToString(svgElement.getBytes("UTF-8"));
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed compiling high-grade vector SVG chart matrix", e);
-        }
+    } catch (Exception e) {
+        throw new RuntimeException("Failed compiling raw SVG string", e);
     }
-}// Pass your strict target points directly
-String vectorSvgBase64 = VectorChartExporter.convertDrawableToSvgBase64((Drawable) baseProjectChart, 727, 330);
-
-model.addAttribute("vectorChart", vectorSvgBase64);
+}
 
 
-<div class="chart-vector-wrapper" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
-
-    <img th:src="|data:image/svg+xml;base64,${vectorChart}|" 
-         style="width: 727pt !important; height: 330pt !important; display: block;" 
-         alt="High-Grade Vector Chart Output" />
+<div class="chart-container" style="width: 727pt; height: 330pt; margin: 0 auto;">
+    
+    <div th:utext="${chartSvg}" style="width: 727pt; height: 330pt;"></div>
 
 </div>
