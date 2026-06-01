@@ -1,40 +1,55 @@
-String rawSvgString = VectorChartExporter.convertDrawableToRawSvg((Drawable) baseProjectChart, 727, 330);
-model.addAttribute("chartSvg", rawSvgString);
-
-
+import org.w3c.dom.Element;
+import org.xhtmlrenderer.extend.FSObjectDrawer;
+import org.xhtmlrenderer.extend.OutputDevice;
 import org.jfree.chart.ui.Drawable;
-import org.jfree.graphics2d.svg.SVGGraphics2D;
+import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.Rectangle2D;
 
-public class VectorChartExporter {
+public class NativeChartDrawer implements FSObjectDrawer {
+    
+    private final Drawable chartDrawable;
 
-    public static String convertDrawableToRawSvg(Drawable drawable, int targetWidth, int targetHeight) {
-      try {
-            SVGGraphics2D svg2d = new SVGGraphics2D(targetWidth, targetHeight);
-            svg2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-            svg2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    public NativeChartDrawer(Drawable chartDrawable) {
+        this.chartDrawable = chartDrawable;
+    }
 
-            Rectangle2D area = new Rectangle2D.Double(0, 0, targetWidth, targetHeight);
-            drawable.draw(svg2d, area);
+    @Override
+    public void draw(Element e, double x, double y, double width, double height, OutputDevice device) {
+        // 1. Grab the direct, native PDF Vector Graphics context
+        Graphics2D g2d = device.getGraphics();
 
-            // 1. Get the raw XML string
-            String svgElement = svg2d.getSVGElement(); 
+        // 2. Inject pristine rendering quality configurations
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
-            // 2. Encode it into a Base64 string to completely hide the raw XML text from the PDF parser
-            return Base64.getEncoder().encodeToString(svgElement.getBytes("UTF-8"));
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed compiling vector SVG string", e);
-        }
+        // 3. Force the chart to calculate its vectors directly for the physical PDF dimensions
+        Rectangle2D area = new Rectangle2D.Double(x, y, width, height);
+        
+        // This invokes your BaseProjectChart directly onto the PDF page!
+        chartDrawable.draw(g2d, area);
     }
 }
 
-<div class="chart-container" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
 
-    <object th:data="|data:image/svg+xml;base64,${vectorChart}|" 
-            type="image/svg+xml"
-            style="width: 727pt !important; height: 330pt !important; display: block;">
+
+PdfRendererBuilder builder = new PdfRendererBuilder();
+
+// Bind your custom chart drawer instance right into the core rendering lifecycle
+builder.useObjectDrawer("application/x-project-chart", new NativeChartDrawer((Drawable) baseProjectChart));
+
+// ... your standard builder configuration properties ...
+builder.withHtmlFile(htmlInputFile);
+builder.toStream(outputPdfStream);
+builder.run();
+
+
+<div class="chart-pdf-wrapper" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
+
+    <object type="application/x-project-chart" 
+            style="width: 727pt; height: 330pt; display: block;">
     </object>
 
 </div>
