@@ -30,9 +30,11 @@ public class VectorChartExporter {
     }
 }
 
+<div class="chart-container" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
 
-<div class="chart-container" style="width: 727pt; height: 330pt; margin: 0 auto;">
-    
-    <div th:utext="${chartSvg}" style="width: 727pt; height: 330pt;"></div>
+    <object th:data="|data:image/svg+xml;base64,${vectorChart}|" 
+            type="image/svg+xml"
+            style="width: 727pt !important; height: 330pt !important; display: block;">
+    </object>
 
 </div>
