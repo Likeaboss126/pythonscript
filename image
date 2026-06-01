@@ -1,41 +1,23 @@
-# Weekly Trend Indicators Section
+public String convertDrawableToBase64(Drawable drawable, int width, int height) {
+        try {
+            // 1. Create an in-memory blank canvas matching your targeted report layout dimensions
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = image.createGraphics();
+            
+            // 2. Force the JCommon Drawable component to paint its vector graphics onto our canvas
+            java.awt.geom.Rectangle2D area = new java.awt.geom.Rectangle2D.Double(0, 0, width, height);
+            drawable.draw(g2, area);
+            g2.dispose(); // Free up system graphics resources immediately
 
-st.subheader("📈 Weekly Trend Indicators")
+            // 3. Compress the raw bitmap canvas down into a standard PNG byte stream
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(image, "png", baos);
+            byte[] imageBytes = baos.toByteArray();
 
-# Use all APIs of the selected functionalities (ignore API filter)
-df_func_filtered = df[df['Functionality'].isin(selected_funcs)].copy()
+            // 4. Encode the raw binary bytes into a clean, text-safe Base64 string
+            return Base64.getEncoder().encodeToString(imageBytes);
 
-# Extract week number
-df_func_filtered['Week'] = pd.to_datetime(df_func_filtered['DateTime']).dt.isocalendar().week
-
-# Get latest two weeks
-latest_weeks = sorted(df_func_filtered['Week'].unique())
-if len(latest_weeks) >= 2:
-    week1, week2 = latest_weeks[-2], latest_weeks[-1]
-
-    df_w1 = df_func_filtered[df_func_filtered['Week'] == week1]
-    df_w2 = df_func_filtered[df_func_filtered['Week'] == week2]
-
-    # Aggregate average response per API per functionality
-    agg_w1 = df_w1.groupby(['Functionality', 'API'])['Averagetimetaken'].mean().reset_index(name='Avg_Week1')
-    agg_w2 = df_w2.groupby(['Functionality', 'API'])['Averagetimetaken'].mean().reset_index(name='Avg_Week2')
-
-    # Merge
-    merged = pd.merge(agg_w1, agg_w2, on=['Functionality', 'API'])
-    merged['Change %'] = ((merged['Avg_Week2'] - merged['Avg_Week1']) / merged['Avg_Week1']) * 100
-
-    # Keep only ±2% changes
-    merged = merged[merged['Change %'].abs() >= 2]
-
-    # Add colored arrows
-    def trend(row):
-        if row['Change %'] > 0:
-            return f"🔴⬇️ Degraded by {abs(row['Change %']):.2f}%"
-        else:
-            return f"🟢⬆️ Improved by {abs(row['Change %']):.2f}%"
-
-    merged['Trend'] = merged.apply(trend, axis=1)
-
-    st.dataframe(merged[['Functionality', 'API', 'Avg_Week1', 'Avg_Week2', 'Trend']], use_container_width=True)
-else:
-    st.info("Not enough weekly data for comparison.")
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to render JCommonDrawable to base64 string", e);
+        }
+    }
