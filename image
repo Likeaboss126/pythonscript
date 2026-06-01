@@ -7,63 +7,68 @@ import java.io.ByteArrayOutputStream;
 import java.util.Base64;
 import javax.imageio.ImageIO;
 
-public class PristineChartExporter {
+public class HighContrastChartExporter {
 
     public static String convertDrawableToBase64(Drawable drawable, int targetWidth, int targetHeight) {
         try {
-            // 1. Double the pixel size for crisp PDF display
+            // 1. Maintain your 2x pixel size for sharpness
             int scaleFactor = 2;
             int imageWidth = targetWidth * scaleFactor;
             int imageHeight = targetHeight * scaleFactor;
 
-            // 2. High-contrast RGB background setup
             BufferedImage image = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_RGB);
             Graphics2D g2d = image.createGraphics();
 
+            // 2. Clear background to pure white
             g2d.setColor(Color.WHITE);
             g2d.fillRect(0, 0, imageWidth, imageHeight);
 
-            // 3. THE SHARPNESS FIX: Explicitly isolate text vs graphics anti-aliasing
+            // 3. THE TEXT & LINE SHARPNESS FIXES
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             
-            // Forces the font renderer to use sub-pixel LCD smoothing (makes text sharp)
+            // Force the font engine to use crisp sub-pixel text rendering (Removes the fuzzy blur)
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
-            
-            // Clean up vector lines and borders
             g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+            
+            // CRITICAL: Force the stroke layout engine to snap to absolute grid points
+            g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_NORMALIZE);
 
-            // 4. Paint directly to the high-res bounding box
-            // If your custom chart supports a scale/DPI factor, invoke it here.
-            // Otherwise, let it fill the high-density space cleanly:
-            java.awt.geom.Rectangle2D area = new java.awt.geom.Rectangle2D.Double(0, 0, imageWidth, imageHeight);
+            // 4. THE LINE CONTRAST FIX: Scale up all thin vector lines
+            // This applies a 2x transform to your coordinate system so the internal chart lines 
+            // (like grid lines and age line loops) get drawn with double the pixel thickness.
+            java.awt.geom.AffineTransform oldTransform = g2d.getTransform();
+            g2d.scale(2.0, 2.0);
+
+            // 5. Draw the chart layout at point sizes
+            java.awt.geom.Rectangle2D area = new java.awt.geom.Rectangle2D.Double(0, 0, targetWidth, targetHeight);
             drawable.draw(g2d, area);
             
+            g2d.setTransform(oldTransform);
             g2d.dispose();
 
-            // 5. Compress to clean PNG
+            // 6. Output clean Base64 string
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(image, "png", baos);
             return Base64.getEncoder().encodeToString(baos.toByteArray());
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed compiling pristine chart layout", e);
+            throw new RuntimeException("Failed compiling high-contrast chart lines", e);
         }
     }
 }
 
 
-// Pass the raw pixel dimensions (727 * 2 and 330 * 2)
-String base64Chart = PristineChartExporter.convertDrawableToBase64((Drawable) baseProjectChart, 1454, 660);
+
+// Pass target points directly
+String base64Chart = HighContrastChartExporter.convertDrawableToBase64((Drawable) baseProjectChart, 727, 330);
 model.addAttribute("cleanChartImage", base64Chart);
 
-<div class="chart-layout-box" style="width: 727pt; height: 330pt; margin: 0 auto; block-size: 330pt; overflow: hidden;">
+
+<div class="chart-box" style="width: 727pt; height: 330pt; margin: 0 auto; text-align: center;">
 
     <img th:src="|data:image/png;base64,${cleanChartImage}|" 
-         width="727" 
-         height="330"
-         style="width: 100% !important; height: 100% !important; display: block; image-rendering: auto;" 
-         alt="Full Size Crisp Chart Layout" />
+         style="width: 727pt !important; height: 330pt !important; display: block; image-rendering: -webkit-optimize-contrast;" 
+         alt="High Contrast Chart Output" />
 
 </div>
