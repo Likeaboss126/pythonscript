@@ -1,11 +1,4 @@
-import io.github.openhtmltopdf.extend.FSImage;
-import io.github.openhtmltopdf.extend.ReplacedElement;
-import io.github.openhtmltopdf.extend.ReplacedElementFactory;
-import io.github.openhtmltopdf.extend.UserAgentCallback;
-import io.github.openhtmltopdf.render.BlockBox;
-import io.github.openhtmltopdf.render.RenderingContext;
-import io.github.openhtmltopdf.svg.AmazonSVGImage; // Built-in high-performance vector container
-import org.w3c.dom.Element;
+import io.github.openhtmltopdf.extend.FSUserAgentCallback;
 import org.jfree.chart.ui.Drawable;
 import org.jfree.graphics2d.svg.SVGGraphics2D;
 import java.io.ByteArrayInputStream;
@@ -13,93 +6,89 @@ import java.io.InputStream;
 import java.awt.geom.Rectangle2D;
 import java.util.Map;
 
-public class DynamicChartImageFactory implements ReplacedElementFactory {
+public class DynamicChartUriResolver implements io.github.openhtmltopdf.extend.FSUriResolver {
     
-    private final ReplacedElementFactory baseFactory;
     private final Map<String, Drawable> chartMap;
 
-    public DynamicChartImageFactory(ReplacedElementFactory baseFactory, Map<String, Drawable> chartMap) {
-        this.baseFactory = baseFactory;
+    // Pass the map holding your compiled report charts
+    public DynamicChartUriResolver(Map<String, Drawable> chartMap) {
         this.chartMap = chartMap;
     }
 
     @Override
-    public ReplacedElement createReplacedElement(RenderingContext context, BlockBox box, 
-                                                 UserAgentCallback uac, int cssWidth, int cssHeight) {
-        Element e = box.getElement();
-        if (e == null) return null;
+    public String resolveURI(String baseUri, String uri) {
+        // Leave string references intact so they hit our stream interceptor below
+        return uri;
+    }
 
-        // Check if this is an image tag requesting a dynamic chart asset
-        if ("img".equalsIgnoreCase(e.getNodeName())) {
-            String src = e.getAttribute("src");
-            
-            if (src != null && src.startsWith("chart://")) {
-                String chartKey = src.substring("chart://".length());
-                Drawable chart = chartMap.get(chartKey);
+    /**
+     * Helper to render the specified JFreeChart directly into an SVG Input Stream
+     */
+    public InputStream getChartStream(String uri) {
+        if (uri != null && uri.startsWith("chart://")) {
+            String chartKey = uri.substring("chart://".length());
+            Drawable chart = chartMap.get(chartKey);
 
-                if (chart != null) {
-                    try {
-                        // 1. Convert target layout sizing from points to standard units
-                        int width = cssWidth > 0 ? cssWidth : 727;
-                        int height = cssHeight > 0 ? cssHeight : 330;
+            if (chart != null) {
+                try {
+                    // Set up standard chart point dimensions
+                    int width = 727;
+                    int height = 330;
 
-                        // 2. Generate pure mathematical vector definitions using JFreeSVG
-                        SVGGraphics2D svg2d = new SVGGraphics2D(width, height);
-                        chart.draw(svg2d, new Rectangle2D.Double(0, 0, width, height));
-                        String svgXml = svg2d.getSVGElement();
+                    // Generate clean, mathematical SVG vector strings
+                    SVGGraphics2D svg2d = new SVGGraphics2D(width, height);
+                    chart.draw(svg2d, new Rectangle2D.Double(0, 0, width, height));
+                    String svgXml = svg2d.getSVGElement();
 
-                        // 3. Convert the string directly to an input stream context
-                        InputStream svgStream = new ByteArrayInputStream(svgXml.getBytes("UTF-8"));
-
-                        // 4. Pass the stream directly to OpenHTMLtoPDF's native SVG layout painter
-                        FSImage svgImage = AmazonSVGImage.load(svgStream, width, height, true);
-                        
-                        // Wrap it up neatly for the rendering engine canvas
-                        return new io.github.openhtmltopdf.render.FSImageReplacedElement(svgImage);
-                        
-                    } catch (Exception ex) {
-                        throw new RuntimeException("Failed processing native chart stream key: " + chartKey, ex);
-                    }
+                    // Return a fresh stream of vector code directly to the renderer
+                    return new ByteArrayInputStream(svgXml.getBytes("UTF-8"));
+                } catch (Exception ex) {
+                    throw new RuntimeException("Error streaming vector chart for key: " + chartKey, ex);
                 }
             }
         }
-
-        // Fall back seamlessly to normal processing for ordinary images
-        return this.baseFactory.createReplacedElement(context, box, uac, cssWidth, cssHeight);
+        return null;
     }
-
-    @Override
-    public void reset() { this.baseFactory.reset(); }
-
-    @Override
-    public void remove(Element e) { this.baseFactory.remove(e); }
 }
 
 
+import io.github.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import io.github.openhtmltopdf.svg.LocalStreamSvgImageElementFactory;
 
-// 1. Group all your financial reports together 
+// 1. Collect your financial charts in a standard map
 Map<String, Drawable> reportCharts = new HashMap<>();
 reportCharts.put("liquidAssets", baseProjectChart1);
-reportCharts.put("pensionPillars", baseProjectChart2);
+reportCharts.put("pensionGrowth", baseProjectChart2);
 
 PdfRendererBuilder builder = new PdfRendererBuilder();
 
-// 2. Wrap and register your factory override context
-ReplacedElementFactory coreFactory = builder.getSharedContext().getReplacedElementFactory();
-builder.getSharedContext().setReplacedElementFactory(new DynamicChartImageFactory(coreFactory, reportCharts));
+// 2. Instantiate our clean resolver context
+DynamicChartUriResolver chartResolver = new DynamicChartUriResolver(reportCharts);
 
-// 3. Run execution
+// 3. Register a custom user agent to process the chart:// stream keys
+builder.useUserAgentCallback(new io.github.openhtmltopdf.util.XRSimpleUserAgent() {
+    @Override
+    public InputStream openStream(String uri) {
+        if (uri != null && uri.startsWith("chart://")) {
+            return chartResolver.getChartStream(uri);
+        }
+        return super.openStream(uri);
+    }
+});
+
+// 4. Fire off standard PDF compilation tasks
 builder.withHtmlFile(htmlInputFile);
 builder.toStream(outputPdfStream);
 builder.run();
 
 
-<div class="chart-box" style="width: 727pt; height: 330pt; margin: 0 auto;">
+
+<div class="chart-wrapper" style="width: 727pt; height: 330pt; margin: 0 auto;">
     <img src="chart://liquidAssets" style="width: 727pt; height: 330pt; display: block;" />
 </div>
 
 <div class="page-break" style="page-break-after: always;"></div>
 
-<div class="chart-box" style="width: 727pt; height: 330pt; margin: 0 auto; margin-top: 40pt;">
-    <img src="chart://pensionPillars" style="width: 727pt; height: 330pt; display: block;" />
+<div class="chart-wrapper" style="width: 727pt; height: 330pt; margin: 0 auto; margin-top: 40pt;">
+    <img src="chart://pensionGrowth" style="width: 727pt; height: 330pt; display: block;" />
 </div>
