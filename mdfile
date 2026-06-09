@@ -413,3 +413,58 @@ The migration is justified because:
 5. Long-term maintenance costs are expected to decrease.
 
 JasperReports currently acts primarily as a document layout engine within the application. The proposed solution achieves the same business outcome while simplifying the technology stack and improving support for accessibility requirements.
+
+
+
+
+
+# Architecture Comparison
+
+| Area | Current (JasperReports + JRXML) | Proposed (Thymeleaf + OpenHTMLToPDF) |
+|--------|--------|--------|
+| Primary Purpose | Report rendering engine | HTML-based document rendering |
+| Template Technology | JRXML | HTML + Thymeleaf |
+| Styling | Jasper-specific styling | Standard CSS |
+| Accessibility | Complex PDF accessibility implementation | Semantic HTML naturally supports accessibility |
+| WCAG/PDF-UA Compliance | Difficult to implement and validate | Easier to implement and validate |
+| Developer Skillset | Java + JRXML + Jasper Studio | Java + HTML + CSS + Thymeleaf |
+| Learning Curve | High | Low |
+| Maintainability | JRXML-specific knowledge required | Standard web technologies |
+| Code Review Experience | XML-heavy diffs | Cleaner HTML diffs |
+| Template Debugging | Jasper-specific debugging | Browser-like HTML debugging |
+| Chart Generation | Generated in Java and injected as images | Generated in Java and rendered as SVG/images |
+| Native Jasper Charts | Not used | Not required |
+| Crosstabs | Not used | Not required |
+| Subreports | Limited/Not used | Thymeleaf fragments |
+| Technology Stack | Mixed | Unified |
+| Framework Dependency | High dependency on Jasper ecosystem | Lower dependency, standards-based |
+| Memory Usage for Graphics | BufferedImage objects retained in memory during rendering | Temporary SVG files referenced during rendering |
+| Heap Utilization | Higher for image-heavy reports | Lower for image-heavy reports |
+| Scalability | Increased GC pressure under load | Reduced heap pressure under load |
+| Accessibility Maintenance | Complex | Simpler |
+| Future Reusability | PDF-focused | HTML, PDF, Email, Web Preview |
+| Long-Term Maintainability | Medium | High |
+
+
+
+# High-Level Architecture Comparison
+
+```text
+┌───────────────────────────────┬───────────────────────────────┐
+│ Current Solution              │ Proposed Solution             │
+├───────────────────────────────┼───────────────────────────────┤
+│ Business Data                 │ Business Data                │
+│        ↓                      │        ↓                     │
+│ Java Processing               │ Java Processing              │
+│        ↓                      │        ↓                     │
+│ BufferedImage                 │ SVG Generation               │
+│        ↓                      │        ↓                     │
+│ Jasper Image Objects          │ Thymeleaf Templates          │
+│        ↓                      │        ↓                     │
+│ JRXML Templates               │ HTML + CSS                  │
+│        ↓                      │        ↓                     │
+│ Jasper Engine                 │ OpenHTMLToPDF              │
+│        ↓                      │        ↓                     │
+│ PDF                           │ PDF                         │
+└───────────────────────────────┴───────────────────────────────┘
+```
