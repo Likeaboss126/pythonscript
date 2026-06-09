@@ -1,0 +1,415 @@
+# Migration from JasperReports (JRXML) to Thymeleaf + OpenHTMLToPDF
+
+## Executive Summary
+
+The migration from JasperReports to Thymeleaf + OpenHTMLToPDF was initiated primarily to address PDF accessibility (WCAG/PDF-UA) requirements and improve long-term maintainability.
+
+A review of the existing reporting implementation revealed that JasperReports is primarily being used as a document layout engine rather than leveraging advanced reporting capabilities such as native charts, crosstabs, or report designers.
+
+The proposed solution standardizes report generation on commonly used web technologies (HTML, CSS, Thymeleaf) while simplifying accessibility implementation and reducing technical complexity.
+
+---
+
+# Current Architecture
+
+```text
+Business Data
+      ↓
+Java Processing
+      ↓
+BufferedImage / Drawable Generation
+      ↓
+Jasper Image Objects
+      ↓
+JRXML Template Rendering
+      ↓
+PDF Export
+```
+
+## Observations
+
+### 1. Limited Usage of Jasper-Specific Features
+
+Analysis of approximately 250+ JRXML templates indicates:
+
+- No usage of Jasper chart components
+- No usage of crosstabs
+- No usage of advanced report designer capabilities
+- No dynamic report-building features
+
+Graphical content is currently generated programmatically within Java and injected into reports as images.
+
+Example:
+
+```text
+Java Code
+    ↓
+Generate BufferedImage
+    ↓
+Pass through imageExpression
+    ↓
+Render inside JRXML
+```
+
+Therefore, JasperReports is primarily functioning as a document rendering layer.
+
+---
+
+### 2. Accessibility Challenges
+
+Implementing PDF accessibility requirements within JRXML templates has proven difficult.
+
+Challenges include:
+
+- Complex accessibility tagging
+- PAC validation failures
+- Additional workarounds for semantic document structure
+- Limited alignment between JRXML and modern accessibility standards
+
+---
+
+### 3. Specialized Skill Requirements
+
+Current solution requires knowledge of:
+
+- JRXML
+- Jasper Studio
+- Jasper Expressions
+- Jasper-specific layout concepts
+
+These skills are not commonly shared across development teams.
+
+---
+
+# Proposed Architecture
+
+```text
+Business Data
+      ↓
+Java Processing
+      ↓
+SVG Generation
+      ↓
+Thymeleaf HTML Template
+      ↓
+OpenHTMLToPDF
+      ↓
+PDF Output
+```
+
+---
+
+# Key Benefits
+
+## 1. Improved Accessibility Compliance
+
+### Current State
+
+Accessibility implementation requires significant effort within JRXML templates.
+
+### Proposed State
+
+HTML provides semantic structure by design:
+
+```html
+<h1>Report Title</h1>
+
+<table>
+    <thead>
+        <tr>
+            <th>Customer</th>
+        </tr>
+    </thead>
+</table>
+```
+
+Benefits:
+
+- Better document structure
+- Easier WCAG implementation
+- Easier PDF-UA compliance
+- Improved PAC validation outcomes
+
+### Business Value
+
+Reduced effort to achieve accessibility compliance.
+
+---
+
+## 2. Single Technology Stack
+
+### Current Stack
+
+```text
+Java
+ +
+JRXML
+ +
+Jasper Studio
+```
+
+### Proposed Stack
+
+```text
+Java
+ +
+HTML
+ +
+CSS
+ +
+Thymeleaf
+```
+
+Benefits:
+
+- Reduced technology fragmentation
+- Easier onboarding
+- Reduced dependency on specialized tools
+
+### Business Value
+
+Lower maintenance overhead and broader team ownership.
+
+---
+
+## 3. Reduced Dependency on Jasper-Specific Expertise
+
+### Current
+
+Developers must understand:
+
+- JRXML structure
+- Jasper Studio
+- Jasper Expressions
+- Jasper-specific debugging
+
+### Proposed
+
+Developers work with:
+
+- HTML
+- CSS
+- Thymeleaf
+
+These are already widely understood technologies.
+
+### Business Value
+
+Improved developer productivity and reduced learning curve.
+
+---
+
+## 4. Better Maintainability
+
+### JRXML Example
+
+```xml
+<textField>
+    ...
+</textField>
+```
+
+### Thymeleaf Example
+
+```html
+<td th:text="${customerName}"></td>
+```
+
+Benefits:
+
+- More readable templates
+- Easier debugging
+- Easier code reviews
+- Cleaner Git diffs
+
+### Business Value
+
+Reduced maintenance effort across 250+ templates.
+
+---
+
+## 5. Reduced Framework Lock-In
+
+Current implementation:
+
+```text
+Drawable
+    ↓
+BufferedImage
+    ↓
+Jasper
+    ↓
+PDF
+```
+
+Proposed implementation:
+
+```text
+Drawable
+    ↓
+SVG
+    ↓
+HTML
+    ↓
+PDF
+```
+
+Benefits:
+
+- Reusable rendering assets
+- Greater portability
+- Easier future migration if required
+
+### Business Value
+
+Lower long-term technology dependency risk.
+
+---
+
+## 6. Reduced JVM Heap Utilization
+
+### Current Approach
+
+```text
+Drawable
+    ↓
+BufferedImage
+    ↓
+Stored within Jasper object model
+    ↓
+PDF Export
+```
+
+Characteristics:
+
+- Large in-memory image objects
+- Increased heap usage
+- Potential GC pressure during report generation
+
+### Proposed Approach
+
+```text
+Drawable
+    ↓
+Temporary SVG File
+    ↓
+Referenced by HTML
+    ↓
+PDF Rendering
+    ↓
+Temporary File Deleted
+```
+
+Characteristics:
+
+- Lightweight SVG resources
+- Reduced memory retention
+- Graphics externalized to filesystem
+- Lower heap pressure
+
+### Business Value
+
+Improved scalability for image-heavy reports.
+
+---
+
+## 7. Better Scalability
+
+### Current
+
+```text
+Concurrent Requests
+       ↓
+Large Image Objects
+       ↓
+Higher Heap Usage
+       ↓
+More Garbage Collection
+```
+
+### Proposed
+
+```text
+Concurrent Requests
+       ↓
+Temporary SVG Resources
+       ↓
+Reduced Heap Usage
+       ↓
+Lower Garbage Collection Activity
+```
+
+### Business Value
+
+More predictable runtime behavior under load.
+
+---
+
+# Performance Considerations
+
+## Important Note
+
+The migration is not primarily driven by execution speed.
+
+Performance benchmarking should be conducted before claiming:
+
+- Faster PDF generation
+- Reduced response times
+- Improved throughput
+
+### Current Position
+
+The primary objectives are:
+
+1. Accessibility compliance
+2. Maintainability
+3. Technology standardization
+4. Reduced memory footprint
+
+Performance improvements, if observed, should be treated as an additional benefit rather than a primary justification.
+
+---
+
+# Risks and Trade-Offs
+
+## Migration Effort
+
+Approximately 250+ JRXML templates require migration.
+
+### Mitigation
+
+- Incremental migration strategy
+- Template conversion automation where possible
+- Prioritize high-value reports first
+
+---
+
+## Loss of Jasper-Specific Features
+
+Potential concern:
+
+- Native charts
+- Crosstabs
+- Advanced reporting components
+
+### Assessment
+
+Current analysis indicates these features are not actively used.
+
+Therefore migration risk is considered low.
+
+---
+
+# Conclusion
+
+The proposed Thymeleaf + OpenHTMLToPDF solution provides a simpler, more maintainable, and accessibility-focused architecture.
+
+The migration is justified because:
+
+1. Existing reports do not utilize advanced Jasper reporting capabilities.
+2. Accessibility compliance is significantly easier to implement using HTML semantics.
+3. Development is standardized on common web technologies.
+4. JVM memory utilization can be reduced through SVG-based asset handling.
+5. Long-term maintenance costs are expected to decrease.
+
+JasperReports currently acts primarily as a document layout engine within the application. The proposed solution achieves the same business outcome while simplifying the technology stack and improving support for accessibility requirements.
