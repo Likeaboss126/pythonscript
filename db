@@ -1,132 +1,117 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <meta charset="UTF-8"/>
-    <title>A4 Landscape Fixed Canvas</title>
-    <style>
-        /* ==========================================================================
-           1. HARD CANVAS SIZING (FOR OPENHTMLTOPDF ENGINE)
-           ========================================================================== */
-        @page {
-            size: 842pt 595pt; /* Sets strict A4 Landscape page dimensions */
-            margin: 0;         /* Strips physical print margins so div fills 100% */
-        }
+#!/bin/bash
 
-        * {
-            box-sizing: border-box;
-        }
+# 1. Quick pre-scan to find the total count
+echo "Counting files... please wait."
+grand_total_files=$(find . -type f -name "*.jrxml" | wc -l)
 
-        /* ==========================================================================
-           2. BROWSER RESET & EMULATION
-           ========================================================================== */
-        html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            width: 842pt !important;
-            height: 595pt !important;
-            page-break-inside: avoid;
-            font-family: Arial, sans-serif;
-            /* Browser fallback styling */
-            background-color: #ffffff; 
-        }
+if [ "$grand_total_files" -eq 0 ]; then
+    echo "No .jrxml files found in this directory or subdirectories."
+    exit 0
+fi
 
-        /* ==========================================================================
-           3. THE PDF ARTWORK CONTAINER (THE FIX)
-           ========================================================================== */
-        .pdf-page-canvas {
-            /* Physically force the container to take up the full page dimensions */
-            width: 842pt;
-            height: 595pt;
-            
-            /* Apply your exact background color hex here so the PDF engine paints it */
-            background-color: #a4c2db; /* Matches the blue-grey tint from image 1 */
-            
-            /* Restricts content from leaking or creating a page 2 */
-            overflow: hidden; 
-            page-break-inside: avoid;
-            
-            /* Add your baseline padding-left (58pt) and top margins here */
-            padding: 40pt 58pt; 
-        }
+echo "=========================================================================================="
+echo "          RECURSIVE JASPERREPORTS 6 COMPONENT ANALYSIS REPORT                             "
+echo "=========================================================================================="
+printf "%-12s | %-45s | %-4s | %-4s | %-4s | %-4s | %-4s | %-4s\n" "Progress" "File Path (Relative)" "Txt" "Fld" "Tbl" "Crt" "Sub" "Frm"
+echo "------------------------------------------------------------------------------------------"
 
-        /* ==========================================================================
-           4. LAYOUT GRID MATRIX
-           ========================================================================== */
-        .header-table-wrapper {
-            display: table;
-            width: 100%;
-        }
+# Initialize Global Counters
+current_file_index=0
+total_static_text=0
+total_text_fields=0
+total_tables=0
+total_charts=0
+total_subreports=0
+total_images=0
+total_frames=0
 
-        .left-column {
-            display: table-cell;
-            width: 75%;
-            vertical-align: top;
-            text-align: left;
-        }
+# Layout Band Counters
+total_page_headers=0
+total_page_footers=0
+total_column_headers=0
+total_column_footers=0
 
-        .right-column {
-            display: table-cell;
-            width: 25%;
-            vertical-align: top;
-            text-align: right;
-        }
+# Use 'find' to locate all .jrxml files recursively from the current directory (.)
+while IFS= read -r file; do
+    [ -f "$file" ] || continue
+    ((current_file_index++))
 
-        /* ==========================================================================
-           5. TYPOGRAPHY BOUNDARIES
-           ========================================================================== */
-        .main-title {
-            font-size: 24pt;
-            line-height: 26pt;
-            font-weight: bold;
-            color: #222222;
-            margin: 0 0 8pt 0;
-        }
+    # 1. Text Elements
+    static_text=$(grep -c "<staticText" "$file")
+    text_fields=$(grep -c "<textField" "$file")
 
-        .subtitle {
-            font-size: 14pt;
-            line-height: 16pt;
-            color: #333333;
-            margin: 0 0 12pt 0;
-        }
+    # 2. Complex & Layout Elements (Handles optional 'jr:' namespace)
+    tables=$(grep -E -c "<(jr:)?table" "$file")
+    lists=$(grep -E -c "<(jr:)?list" "$file")
+    actual_tables=$((tables + lists))
 
-        .meta-text {
-            font-size: 11pt;
-            line-height: 14pt;
-            margin: 0 0 4pt 0;
-            color: #444444;
-        }
-    </style>
-</head>
-<body>
+    # 3. Graphical Elements (Standard Jasper 6 Chart Types and Images)
+    charts=$(grep -E -c "<(pie|bar|line|area|bubble|candlestick|highLow|multiAxis|scatter|stacked|timeSeries|gantt)?Chart" "$file")
+    images=$(grep -c "<image" "$file")
 
-    <div class="pdf-page-canvas">
-        
-        <div class="header-table-wrapper">
-            
-            <div class="left-column">
-                <div class="main-title">
-                    Projection of your liquid assets - last financial plan - scenario
-                </div>
-                <div class="subtitle">
-                    Conservative
-                </div>
-                <div class="meta-text" style="margin-top: 15pt; color: #555555;">
-                    Based on your financial situation and your considerations the following projection of your liquid assets summarizes your financial plan before optimization.
-                </div>
-            </div>
-            
-            <div class="right-column">
-                <div class="meta-text" style="font-weight: bold;">
-                    M. and J. Vollenw...
-                </div>
-                <div class="meta-text">
-                    29 May 2026
-                </div>
-            </div>
-            
-        </div>
+    # 4. Advanced/Structural Elements
+    subreports=$(grep -c "<subreport" "$file")
+    crosstabs=$(grep -c "<crosstab" "$file")
+    frames=$(grep -c "<frame" "$file")
+    
+    # 5. Document Structure Bands
+    page_header=$(grep -c "<pageHeader" "$file")
+    page_footer=$(grep -c "<pageFooter" "$file")
+    col_header=$(grep -c "<columnHeader" "$file")
+    col_footer=$(grep -c "<columnFooter" "$file")
 
-    </div>
+    # Add to Running Global Totals
+    ((total_static_text += static_text))
+    ((total_text_fields += text_fields))
+    ((total_tables += actual_tables))
+    ((total_charts += charts))
+    ((total_subreports += subreports))
+    ((total_images += images))
+    ((total_frames += frames))
+    
+    ((total_page_headers += page_header))
+    ((total_page_footers += page_footer))
+    ((total_column_headers += col_header))
+    ((total_column_footers += col_footer))
 
-</body>
-</html>
+    # Flag complex files for quick identification in the live view
+    alert=""
+    if [ "$actual_tables" -gt 0 ]; then alert="${alert}[TABLES] "; fi
+    if [ "$charts" -gt 0 ]; then alert="${alert}[CHARTS] "; fi
+    if [ "$subreports" -gt 0 ]; then alert="${alert}[SUBREPORTS] "; fi
+
+    # Clean up the display path name if it is too long
+    if [ ${#file} -gt 45 ]; then
+        display_path="...${file: -42}"
+    else
+        display_path="$file"
+    fi
+
+    # Create progress string, e.g., "[12/250]"
+    progress_str="[$current_file_index/$grand_total_files]"
+
+    printf "%-12s | %-45s | %-4d | %-4d | %-4d | %-4d | %-4d | %-4d %s\n" \
+        "$progress_str" "$display_path" "$static_text" "$text_fields" "$actual_tables" "$charts" "$subreports" "$frames" "$alert"
+
+done < <(find . -type f -name "*.jrxml" | sort)
+
+echo "=========================================================================================="
+echo "   COMPLETE GLOBAL SUMMARY INVENTORY (ALL SUBFOLDERS)"
+echo "=========================================================================================="
+echo " Total JRXML Files Scanned : $current_file_index out of $grand_total_files"
+echo "------------------------------------------------------------------------------------------"
+echo " NATIVE COMPONENT COUNTS:"
+echo "  • Total Static Text Elements (<staticText>)   : $total_static_text"
+echo "  • Total Dynamic Text Fields (<textField>)     : $total_text_fields"
+echo "  • Total Layout Frames (<frame>)               : $total_frames"
+echo "  • Total Image Elements (<image>)              : $total_images"
+echo "  • Total Tables/Lists Found                    : $total_tables"
+echo "  • Total Charts Found                          : $total_charts"
+echo "  • Total Subreports Found                      : $total_subreports"
+echo "------------------------------------------------------------------------------------------"
+echo " STRUCTURAL TEMPLATE BANDS FOUND:"
+echo "  • Total Page Headers (<pageHeader>)           : $total_page_headers"
+echo "  • Total Page Footers (<pageFooter>)           : $total_page_footers"
+echo "  • Total Column Headers (<columnHeader>)       : $total_column_headers"
+echo "  • Total Column Footers (<columnFooter>)       : $total_column_footers"
+echo "=========================================================================================="
