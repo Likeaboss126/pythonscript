@@ -1,0 +1,31 @@
+1. Performance Testing & Vendor Handover (Q1 / First 3 Months)
+Performance Engineering & Optimization: Applied extensive expertise in performance testing to evaluate, stress-test, and baseline enterprise system performance, ensuring system stability ahead of critical transitions.
+
+Handover & Risk Mitigation: Actively participated in system evaluations and operational handovers, ensuring continuity of service and establishing stability metrics during critical vendor transition phases.
+
+2. Legacy Template Modernization & Compliance (Thymeleaf Migration)
+Automated Code-Level Conversion: Designed and executed an innovative automated conversion process to migrate legacy reporting templates into modern, accessible structures.
+
+Accessibility & Standards Compliance: Successfully transitioned templates into WCAG-compliant Thymeleaf HTML and PDF formats, significantly improving document accessibility, maintainability, and standard formatting.
+
+3. Project SIGMA: Technical Leadership & AI-Driven Delivery (Q2 – Q4)
+Successful 100% Product In-Housing: Led the critical technical transition, architecture, and end-to-end execution of Project SIGMA post-vendor offboarding, overcoming zero formal Knowledge Transfer (KT) constraints through rigorous functional alignment and domain leadership.
+
+Production Stabilization & BAU Velocity: Systematically resolved legacy production bottlenecks, re-engineered application resilience, and maintained 100% delivery velocity on continuous Business-As-Usual (BAU) features without release delays.
+
+AI-Powered Engineering & RPI Framework: Pioneered an advanced AI-assisted development workflow, leveraging custom code analysis agents to decode legacy repositories and implementing an RPI (Refine, Plan, Implement) spec development model.
+
+Proposal Management & Timeline Acceleration: Delivered core proposal management functionality, utilizing custom AI agents for data automation and validation—successfully outpacing the vendor's Q1 estimate to deliver inside the current calendar year.
+
+Functional & Technical Anchoring: Served as the core functional and delivery anchor for the engineering team, bridging complex business requirements with technical execution and guiding senior peers through critical delivery milestones.
+
+
+Expanded Thymeleaf Section for Your Year-End Review
+Legacy Template Modernization & EAA Compliance
+Regulatory Compliance & EAA Achievement: Spearheaded the automated conversion of legacy reporting templates to achieve 100% compliance with the European Accessibility Act (EAA) and WCAG standards, ensuring that complex financial and customer-facing documents met strict regulatory mandates.
+
+Automated Code-Level Conversion Pipeline: Engineered an innovative, automated conversion process to migrate legacy reporting templates from outdated formats into accessible, modern Thymeleaf HTML and PDF structures—eliminating manual formatting bottlenecks and human error.
+
+Scalable Document Accessibility: Transformed how internal applications handle dynamic document generation, embedding robust accessibility features (such as structured semantic markup, screen-reader compatibility, and compliant styling) directly into the core template layer.
+
+Cross-Team Impact: Provided a foundational, reusable standard for document generation that future-proofed the bank's reporting infrastructure against evolving regulatory requirements.
